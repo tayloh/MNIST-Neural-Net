@@ -19,6 +19,9 @@ int main(int argc, char **argv)
     float dot = linalg_vector_dot(v1, v2);
     printf("Dot product: %.2f\n", dot);
 
+    linalg_vector_normalize(v1);
+    linalg_vector_print(v1);
+
     linalg_vector_free(v1);
     linalg_vector_free(v2);
 
@@ -58,6 +61,13 @@ int main(int argc, char **argv)
     Matrix *ab = linalg_matrix_multiply(a, b);
     linalg_matrix_print(ab);
 
+    Vector *row1 = linalg_matrix_get_row(ab, 1);
+    Vector *col0 = linalg_matrix_get_column(ab, 0);
+    linalg_vector_print(row1);
+    linalg_vector_print(col0);
+    linalg_vector_free(row1);
+    linalg_vector_free(col0);
+
     linalg_matrix_free(a);
     linalg_matrix_free(b);
     linalg_matrix_free(ab);
@@ -71,14 +81,10 @@ int main(int argc, char **argv)
 
     linalg_matrix_free(I3);
 
-    Mnist *mnist = mnist_create(MNIST_NUM_TRAIN);
-    mnist_load_images(mnist, "./mnist-dataset/train-images.idx3-ubyte");
-    mnist_load_labels(mnist, "./mnist-dataset/train-labels.idx1-ubyte");
-
-    mnist_print_image_x(mnist, 0);
-    mnist_print_image_x(mnist, 1);
-    mnist_print_image_x(mnist, 2);
-    mnist_print_image_x(mnist, MNIST_NUM_TRAIN - 1);
+    Mnist *mnist = mnist_create(MNIST_NUM_TEST);
+    mnist_load_images(mnist, "./mnist-dataset/t10k-images.idx3-ubyte");
+    mnist_load_labels(mnist, "./mnist-dataset/t10k-labels.idx1-ubyte");
+    mnist_print_image_x(mnist, MNIST_NUM_TEST - 1);
 
     mnist_free(mnist);
 

@@ -360,3 +360,47 @@ void linalg_matrix_apply(Matrix *m, float (*func)(float))
         }
     }
 }
+
+Vector *linalg_matrix_get_column(const Matrix *m, int column)
+{
+    if (!m || !m->data)
+    {
+        fprintf(stderr, "Error: get_column NULL matrix");
+        exit(EXIT_FAILURE);
+    }
+
+    if (column < 0 || column >= m->columns)
+    {
+        fprintf(stderr, "Error: get_column column out of bounds");
+        exit(EXIT_FAILURE);
+    }
+
+    Vector *result = linalg_vector_create(m->rows);
+    for (int i = 0; i < result->size; ++i)
+    {
+        result->data[i] = m->data[i][column];
+    }
+    return result;
+}
+
+Vector *linalg_matrix_get_row(const Matrix *m, int row)
+{
+    if (!m || !m->data)
+    {
+        fprintf(stderr, "Error: get_row NULL matrix");
+        exit(EXIT_FAILURE);
+    }
+
+    if (row < 0 || row >= m->rows)
+    {
+        fprintf(stderr, "Error: get_row row out of bounds");
+        exit(EXIT_FAILURE);
+    }
+
+    Vector *result = linalg_vector_create(m->columns);
+    for (int i = 0; i < result->size; ++i)
+    {
+        result->data[i] = m->data[row][i];
+    }
+    return result;
+}

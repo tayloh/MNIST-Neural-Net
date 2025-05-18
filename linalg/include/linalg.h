@@ -65,4 +65,7 @@ Matrix *linalg_matrix_hadamard(const Matrix *a, const Matrix *b);
 
 void linalg_matrix_apply(Matrix *m, float (*func)(float));
 
+Vector *linalg_matrix_get_column(const Matrix *m, int column);
+Vector *linalg_matrix_get_row(const Matrix *m, int row);
+
 #endif
