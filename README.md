@@ -1,4 +1,4 @@
-# MNIST Neural network
+# taylohs MNIST Neural network
 
 ## Run
 gcc -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c linalg/src/vector.c linalg/src/matrix.c
