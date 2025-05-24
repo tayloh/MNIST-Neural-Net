@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <time.h>
+#include <math.h>
 
 #include "../linalg/include/linalg.h"
 #include "mnist.h"
@@ -6,6 +8,8 @@
 int main(int argc, char **argv)
 {
     printf("MNIST Neural net\n");
+
+    srand(time(NULL));
 
     Vector *v1 = linalg_vector_create(3);
     Vector *v2 = linalg_vector_create(3);

@@ -41,7 +41,9 @@ Matrix *linalg_matrix_create(int rows, int columns)
 
             // Free previously allocated rows
             for (int j = 0; j < i; ++j)
+            {
                 free(m->data[j]);
+            }
             free(m->data);
             free(m);
             exit(EXIT_FAILURE);
