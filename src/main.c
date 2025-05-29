@@ -1,9 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <math.h>
 
 #include "../linalg/include/linalg.h"
 #include "mnist.h"
+#include "neuralnet.h"
 
 int main(int argc, char **argv)
 {
@@ -91,6 +93,14 @@ int main(int argc, char **argv)
     mnist_print_image_x(mnist, MNIST_NUM_TEST - 1);
 
     mnist_free(mnist);
+
+    int nn_layers[5] = {MNIST_IMAGE_SIZE, 2, 5, 5, 10};
+    NeuralNet *nn = neuralnet_create(5, nn_layers);
+    neuralnet_init_w_b_he(nn);
+    neuralnet_print(nn);
+    neuralnet_print_layer(nn, 2);
+
+    neuralnet_free(nn);
 
     return 0;
 }

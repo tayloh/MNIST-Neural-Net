@@ -128,11 +128,23 @@ void neuralnet_free(NeuralNet *nn)
 
 void neuralnet_set_activation(NeuralNet *nn, float (*activation)(float))
 {
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_set_activation NULL neuralnet");
+        exit(EXIT_FAILURE);
+    }
+
     nn->activation = activation;
 }
 
 void neuralnet_set_activation_derivative(NeuralNet *nn, float (*activation_derivative)(float))
 {
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_set_activation_derivative NULL neuralnet");
+        exit(EXIT_FAILURE);
+    }
+
     nn->activation_derivative = activation_derivative;
 }
 
@@ -189,4 +201,49 @@ void neuralnet_init_w_b_he(NeuralNet *nn)
         // Zero initialize biases
         linalg_vector_fill(nn->biases[i], 0.0f);
     }
+}
+
+void neuralnet_print_layer(const NeuralNet *nn, int layer_index)
+{
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_print NULL neuralnet");
+        exit(EXIT_FAILURE);
+    }
+
+    if (layer_index >= nn->num_layers)
+    {
+        fprintf(stderr, "Error: neuralnet_print_layer layer_index out of bounds");
+        exit(EXIT_FAILURE);
+    }
+
+    if (layer_index == 0)
+    {
+        printf("NeuralNet layer 0 (input) has no associated weights or biases");
+        return;
+    }
+
+    printf("NeuralNet layer %d \n", layer_index);
+    printf("biases[%d] = %3.3f\n", layer_index - 1, nn->biases[layer_index - 1]);
+    printf("weights[%d] = \n", layer_index - 1);
+    linalg_matrix_print(nn->weights[layer_index - 1]);
+}
+
+void neuralnet_print(const NeuralNet *nn)
+{
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_print NULL neuralnet");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("NeuralNet ");
+
+    printf("[");
+    for (int i = 0; i < nn->num_layers - 1; ++i)
+    {
+        printf("%d, ", nn->layer_sizes[i]);
+    }
+    printf("%d", nn->layer_sizes[nn->num_layers - 1]);
+    printf("]\n");
 }

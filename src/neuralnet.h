@@ -51,7 +51,7 @@ void neuralnet_set_activation_derivative(NeuralNet *nn, float (*activation_deriv
 float ReLU(float x);
 float ReLU_derivative(float x);
 
-void neuralnet_init_w_b_he(NeuralNet *nn); // TODO
+void neuralnet_init_w_b_he(NeuralNet *nn);
 void neuralnet_init_w_b_xavier(NeuralNet *nn);
 
 void neuralnet_train(NeuralNet *nn, const Mnist *mnist);
@@ -66,5 +66,8 @@ void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, f
 
 float neuralnet_compute_loss(const Vector *output, const Vector *target);                // TODO
 void neuralnet_compute_output_error(NeuralNet *nn, const Vector *target, Vector *delta); // TODO
+
+void neuralnet_print(const NeuralNet *nn);
+void neuralnet_print_layer(const NeuralNet *nn, int layer_index);
 
 #endif
