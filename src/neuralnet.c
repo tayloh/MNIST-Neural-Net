@@ -50,7 +50,31 @@ static float box_muller_sample()
     return z0;
 }
 
-// Don't touch biases[0], input layer has no bias vector
+static Vector *softmax(const Vector *v)
+{
+    Vector *result = linalg_vector_create(v->size);
+
+    // When you compute exp(x_i) for values of x_i that are large, exp(x_i)
+    // can easily overflow, i.e., exceed the largest number representable in floating point.
+    // So, shift the exponential (rescale) by the max
+    float max_val = linalg_vector_max(v);
+
+    float sum = 0.0;
+    for (int i = 0; i < v->size; i++)
+    {
+        result->data[i] = exp(v->data[i] - max_val);
+        sum += result->data[i];
+    }
+
+    for (int i = 0; i < v->size; i++)
+    {
+        result->data[i] /= sum;
+    }
+
+    // All values sum to 1, can be used as probability distribution
+    return result;
+}
+
 NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
 {
 
@@ -200,6 +224,7 @@ void neuralnet_load_model(NeuralNet *nn, const char *model_fp)
 }
 
 // Initialize weights and biases using He initialization
+// FINAL: try with and without
 void neuralnet_init_w_b_he(NeuralNet *nn)
 {
     if (!nn)
@@ -244,23 +269,15 @@ int neuralnet_infer(NeuralNet *nn, const Vector *input)
     // so this is fine
     neuralnet_forward(nn, input);
 
+    // This is working directly with the logits (output layer activation values) for now
+    // We don't need softmax here...
+
     // Get final activations
     Vector *output = nn->activations[nn->num_layers - 1];
 
     // Find index with max value (argmax)
-    int argmax = 0;
-    float max = output->data[0];
+    int argmax = linalg_vector_argmax(output);
 
-    for (int i = 1; i < output->size; ++i)
-    {
-        if (output->data[i] > max)
-        {
-            max = output->data[i];
-            argmax = i;
-        }
-    }
-
-    // Since output should be 0-9, I can just take the argmax directly
     return argmax;
 }
 
@@ -292,10 +309,35 @@ void neuralnet_forward(NeuralNet *nn, const Vector *input)
         // Optimize if I ever process larger vectors... (also, remove all the if checks and so on.. in my linalg lib)
         linalg_vector_copy_into(nn->activations[l + 1], z);
 
-        linalg_vector_apply(nn->activations[l + 1], nn->activation);
+        // Don't use ReLU on the output layer
+        // FINAL: look this over, try with and without
+        if (l < nn->num_layers - 2)
+        {
+            linalg_vector_apply(nn->activations[l + 1], nn->activation);
+        }
 
         linalg_vector_free(z);
     }
+}
+
+void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Vector **grad_b)
+{
+    // Do this slowly and make sure you understand the math in each step...
+}
+
+void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, float learning_rate)
+{
+}
+
+void neuralnet_train(NeuralNet *nn, const Vector **inputs)
+{
+    // Shuffle data each epoch
+    // Allocate gradients once per epoch
+    // Validation loss -> early stopping
+}
+
+void neuralnet_test(NeuralNet *nn, const Vector **inputs)
+{
 }
 
 void neuralnet_print_layer(const NeuralNet *nn, int layer_index)

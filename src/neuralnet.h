@@ -58,20 +58,21 @@ float ReLU(float x);
 float ReLU_derivative(float x);
 
 void neuralnet_init_w_b_he(NeuralNet *nn);
-void neuralnet_init_w_b_xavier(NeuralNet *nn);
+// void neuralnet_init_w_b_xavier(NeuralNet *nn);
 
-void neuralnet_train(NeuralNet *nn, const Mnist *mnist);
-void neuralnet_test(const NeuralNet *nn, const Mnist *mnist);
+// Inputs will be Mnist->images
+void neuralnet_train(NeuralNet *nn, const Vector **inputs); // todo
+void neuralnet_test(NeuralNet *nn, const Vector **inputs);  // todo
 
-int neuralnet_infer(NeuralNet *nn, const Vector *image);
+int neuralnet_infer(NeuralNet *nn, const Vector *input);
 
 void neuralnet_forward(NeuralNet *nn, const Vector *input);
 
 void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Vector **grad_b);      // TODO
 void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, float learning_rate); // TODO
 
-float neuralnet_compute_loss(const Vector *output, const Vector *target);                // TODO
-void neuralnet_compute_output_error(NeuralNet *nn, const Vector *target, Vector *delta); // TODO
+// Use cross-entropy since MNIST is a classification task
+float neuralnet_compute_CE(const Vector *output, const Vector *target); // TODO
 
 void neuralnet_print(const NeuralNet *nn);
 void neuralnet_print_layer(const NeuralNet *nn, int layer_index);

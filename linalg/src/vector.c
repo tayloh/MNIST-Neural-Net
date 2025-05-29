@@ -365,3 +365,46 @@ void linalg_vector_add_into(Vector *a, const Vector *b)
         a->data[i] += b->data[i];
     }
 }
+
+int linalg_vector_argmax(const Vector *v)
+{
+    if (!v || !v->data)
+    {
+        fprintf(stderr, "Error: vector_argmax NULL v");
+        exit(EXIT_FAILURE);
+    }
+
+    int argmax = 0;
+    float max = v->data[0];
+
+    for (int i = 1; i < v->size; ++i)
+    {
+        if (v->data[i] > max)
+        {
+            max = v->data[i];
+            argmax = i;
+        }
+    }
+
+    return argmax;
+}
+
+float linalg_vector_max(const Vector *v)
+{
+    if (!v || !v->data)
+    {
+        fprintf(stderr, "Error: vector_max NULL v");
+        exit(EXIT_FAILURE);
+    }
+
+    float max = v->data[0];
+    for (int i = 0; i < v->size; ++i)
+    {
+        if (v->data[i] > max)
+        {
+            max = v->data[i];
+        }
+    }
+
+    return max;
+}

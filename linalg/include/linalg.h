@@ -34,6 +34,8 @@ void linalg_vector_normalize(Vector *v);
 
 float linalg_vector_dot(const Vector *a, const Vector *b);
 float linalg_vector_sum(const Vector *v);
+int linalg_vector_argmax(const Vector *v);
+float linalg_vector_max(const Vector *v);
 
 Vector *linalg_vector_add(const Vector *a, const Vector *b);
 void linalg_vector_add_into(Vector *a, const Vector *b);
