@@ -21,7 +21,13 @@ typedef struct
     // Bias for each layer (excluding input layer)
     Vector **biases;
 
-    // TODO: Need to store activations and pre-activation values (activations and zs)
+    // Activations are the values for each neuron after doing z = w1 * x1 + w2 * x2 + ... + wn * xn - bi
+    // activation_i = activation(z)
+    Vector **activations;
+
+    // zs are the pre-activation values, that is, z above
+    // They are cached to be used in backpropagation
+    Vector **zs;
 
 } NeuralNet;
 
@@ -57,9 +63,9 @@ void neuralnet_init_w_b_xavier(NeuralNet *nn);
 void neuralnet_train(NeuralNet *nn, const Mnist *mnist);
 void neuralnet_test(const NeuralNet *nn, const Mnist *mnist);
 
-int neuralnet_infer(const NeuralNet *nn, const Vector *image);
+int neuralnet_infer(NeuralNet *nn, const Vector *image);
 
-void neuralnet_forward(NeuralNet *nn, const Vector *input); // TODO
+void neuralnet_forward(NeuralNet *nn, const Vector *input);
 
 void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Vector **grad_b);      // TODO
 void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, float learning_rate); // TODO

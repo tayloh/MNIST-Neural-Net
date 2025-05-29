@@ -92,14 +92,20 @@ int main(int argc, char **argv)
     mnist_load_labels(mnist, "./mnist-dataset/t10k-labels.idx1-ubyte");
     mnist_print_image_x(mnist, MNIST_NUM_TEST - 1);
 
-    mnist_free(mnist);
-
     int nn_layers[5] = {MNIST_IMAGE_SIZE, 2, 5, 5, 10};
     NeuralNet *nn = neuralnet_create(5, nn_layers);
+    neuralnet_set_activation(nn, ReLU);
+    neuralnet_set_activation_derivative(nn, ReLU_derivative);
+
     neuralnet_init_w_b_he(nn);
+
     neuralnet_print(nn);
     neuralnet_print_layer(nn, 2);
 
+    int inferred_value = neuralnet_infer(nn, mnist->images[MNIST_NUM_TEST - 1]);
+    printf("NeuralNet inferred %d", inferred_value);
+
+    mnist_free(mnist);
     neuralnet_free(nn);
 
     return 0;

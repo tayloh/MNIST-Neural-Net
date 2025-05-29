@@ -97,8 +97,37 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
     // length of layer_sizes = num_layers
     for (int i = 0; i < num_layers - 1; ++i)
     {
-        nn->weights[i] = linalg_matrix_create(layer_sizes[i], layer_sizes[i + 1]);
+        // If layer 0 has 2 neurons and layer 1 has 5 neurons, then we have
+        // Matrix_5x2
+        // [   1.079    0.542 ]
+        // [   0.646   -0.197 ]
+        // [   1.225    0.848 ]
+        // [  -0.157   -1.124 ]
+        // [   0.575    0.346 ]
+        // That is, row 1 holds the incoming weights for neuron 1 in layer 1, and so on
+        nn->weights[i] = linalg_matrix_create(layer_sizes[i + 1], layer_sizes[i]);
         nn->biases[i] = linalg_vector_create(layer_sizes[i + 1]);
+    }
+
+    // Alloc activations
+    nn->activations = (Vector **)calloc(num_layers, sizeof(Vector *));
+
+    // Alloc pre activations
+    nn->zs = (Vector **)calloc(num_layers, sizeof(Vector *));
+
+    if (!nn->activations || !nn->zs)
+    {
+        perror("calloc NeuralNet activations/zs");
+        free(nn->activations);
+        free(nn->zs);
+        free(nn);
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < num_layers; ++i)
+    {
+        nn->activations[i] = linalg_vector_create(layer_sizes[i]);
+        nn->zs[i] = linalg_vector_create(layer_sizes[i]);
     }
 
     return nn;
@@ -200,6 +229,72 @@ void neuralnet_init_w_b_he(NeuralNet *nn)
 
         // Zero initialize biases
         linalg_vector_fill(nn->biases[i], 0.0f);
+    }
+}
+
+int neuralnet_infer(NeuralNet *nn, const Vector *input)
+{
+    if (!nn || !input)
+    {
+        fprintf(stderr, "Error: neuralnet_infer NULL nn or input.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // nn->activations never depend on previous nn->activations values
+    // so this is fine
+    neuralnet_forward(nn, input);
+
+    // Get final activations
+    Vector *output = nn->activations[nn->num_layers - 1];
+
+    // Find index with max value (argmax)
+    int argmax = 0;
+    float max = output->data[0];
+
+    for (int i = 1; i < output->size; ++i)
+    {
+        if (output->data[i] > max)
+        {
+            max = output->data[i];
+            argmax = i;
+        }
+    }
+
+    // Since output should be 0-9, I can just take the argmax directly
+    return argmax;
+}
+
+void neuralnet_forward(NeuralNet *nn, const Vector *input)
+{
+    if (!nn || !input)
+    {
+        fprintf(stderr, "Error: neuralnet_forward NULL nn or input.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy input to activations[0]
+    linalg_vector_copy_into(nn->activations[0], input);
+    linalg_vector_copy_into(nn->zs[0], input);
+
+    for (int l = 0; l < nn->num_layers - 1; ++l)
+    {
+        // Think of l as the previous layer (size of weights and biases is one less than num layers)
+        // l+1 is the current layer we are doing activations for
+
+        // z = weights[l] (matrix) * a[l] (vector) + bias[l] (vector)
+        Vector *z = linalg_vector_transform(nn->weights[l], nn->activations[l]);
+        linalg_vector_add_into(z, nn->biases[l]);
+
+        // Store zs for backpropagation
+        linalg_vector_copy_into(nn->zs[l + 1], z);
+
+        // Apply activation on current layer (memcpy is fast... so let's leave it as two calls)
+        // Optimize if I ever process larger vectors... (also, remove all the if checks and so on.. in my linalg lib)
+        linalg_vector_copy_into(nn->activations[l + 1], z);
+
+        linalg_vector_apply(nn->activations[l + 1], nn->activation);
+
+        linalg_vector_free(z);
     }
 }
 

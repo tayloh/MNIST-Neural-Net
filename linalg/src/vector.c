@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 Vector *linalg_vector_create(int size)
 {
@@ -302,8 +303,65 @@ void linalg_vector_apply(Vector *v, float (*func)(float))
         exit(EXIT_FAILURE);
     }
 
+    if (!func)
+    {
+        fprintf(stderr, "Error: vector_apply NULL func");
+        exit(EXIT_FAILURE);
+    }
+
     for (int i = 0; i < v->size; ++i)
     {
         v->data[i] = func(v->data[i]);
+    }
+}
+
+// Copy values of b into a
+void linalg_vector_copy_into(Vector *a, const Vector *b)
+{
+    if (!a || !a->data)
+    {
+        fprintf(stderr, "Error: vector_copy_into a NULL vector");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!b || !b->data)
+    {
+        fprintf(stderr, "Error: vector_copy_into b NULL vector");
+        exit(EXIT_FAILURE);
+    }
+
+    if (a->size != b->size)
+    {
+        fprintf(stderr, "Error: vector_copy_into size mismatch");
+        exit(EXIT_FAILURE);
+    }
+
+    memcpy(a->data, b->data, b->size * sizeof(float));
+}
+
+// Add values of b onto values of a
+void linalg_vector_add_into(Vector *a, const Vector *b)
+{
+    if (!a || !a->data)
+    {
+        fprintf(stderr, "Error: vector_copy_into a NULL vector");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!b || !b->data)
+    {
+        fprintf(stderr, "Error: vector_copy_into b NULL vector");
+        exit(EXIT_FAILURE);
+    }
+
+    if (a->size != b->size)
+    {
+        fprintf(stderr, "Error: vector_copy_into size mismatch");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < a->size; ++i)
+    {
+        a->data[i] += b->data[i];
     }
 }

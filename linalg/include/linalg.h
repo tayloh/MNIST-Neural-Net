@@ -22,6 +22,7 @@ typedef struct
 
 Vector *linalg_vector_create(int size);
 Vector *linalg_vector_copy(const Vector *v);
+void linalg_vector_copy_into(Vector *a, const Vector *b);
 
 void linalg_vector_free(Vector *v);
 void linalg_vector_fill(Vector *v, float value);
@@ -35,6 +36,7 @@ float linalg_vector_dot(const Vector *a, const Vector *b);
 float linalg_vector_sum(const Vector *v);
 
 Vector *linalg_vector_add(const Vector *a, const Vector *b);
+void linalg_vector_add_into(Vector *a, const Vector *b);
 Vector *linalg_vector_sub(const Vector *a, const Vector *b);
 Vector *linalg_vector_transform(const Matrix *m, const Vector *v);
 Vector *linalg_vector_hadamard(const Vector *a, const Vector *b);
