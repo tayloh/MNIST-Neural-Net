@@ -309,7 +309,7 @@ void neuralnet_forward(NeuralNet *nn, const Vector *input)
         // Optimize if I ever process larger vectors... (also, remove all the if checks and so on.. in my linalg lib)
         linalg_vector_copy_into(nn->activations[l + 1], z);
 
-        // Don't use ReLU on the output layer
+        // Don't use ReLU on the output layer (softmax CE needs raw logits)
         // FINAL: look this over, try with and without
         if (l < nn->num_layers - 2)
         {
@@ -355,21 +355,136 @@ float neuralnet_compute_softmax_CE(const Vector *output, const Vector *target)
 
 void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Vector **grad_b)
 {
-    // Do this slowly and make sure you understand the math in each step...
+    // TODO: Make sure this works...
+
+    // --------- OUTPUT LAYER ---------
+    // Output layer index
+    int L = nn->num_layers - 1;
+
+    // Predicted softmax output
+    Vector *y_hat = softmax(nn->zs[L]);
+
+    // We need del L/del z since it's the first part of the chain rule
+    // For layer L we have: del L/del W = del L/del z * del z/del W
+    // See https://en.wikipedia.org/wiki/Backpropagation#Matrix_multiplication
+
+    // a = y_hat here (activated z), y = target
+    // del L/del z = del L/del a * del a/del z = a^L - y
+    Vector *delta = linalg_vector_sub(y_hat, target);
+
+    // For layer L we have: del L del b = del L/del z * del z/del b
+    // Where del L/del z = a^L - y = delta (vector above)
+    // and del z/del b where z = W^l * a^(l-1) + b^l is just = 1 (first term is constant in terms of b)
+    // => del L del b = delta * 1
+    linalg_vector_copy_into(grad_b[L - 1], delta);
+
+    // del L/del W^L = del L/del z * del z/del W^L = delta x a^(L-1) (outer product)
+    // del z/del W^L = a^(L-1) (see backprop.md why)
+    // grad_w_L is a matrix of size |delta| x |a^(L-1)| (so we have a gradient for each ingoing weight in the layer)
+    // this is how it must be
+    Matrix *grad_w_L = linalg_vector_outer_prod(delta, nn->activations[L - 1]);
+    linalg_matrix_copy_into(grad_w[L - 1], grad_w_L);
+    linalg_matrix_free(grad_w_L);
+
+    // --------- HIDDEN LAYERS ---------
+    // I understand this on an ok level, but should do it with pen and paper
+    for (int l = L - 1; l > 0; --l)
+    {
+        // The delta is what is important in every layer when computing
+        // del L/del W^l = delta_l x a^(l-1) = grad_w for layer l
+        // and del L/del b = delta_l = grad_b for layer l
+
+        // If we have delta_l, then (right to left)
+        // delta_(l-1) =  f'( z^(l-1) ) hadamard (W^l)^t * delta_l (*)
+
+        // intermediate term = (W^l)^t * delta_l
+        Matrix *w_l_transpose = linalg_matrix_transpose(nn->weights[l]);
+        Vector *intermediate = linalg_vector_transform(w_l_transpose, delta);
+
+        // f'(z^(l-1)), yes nn->zs[l] is correct... zs has one more element than
+        // weights, so this is consistent with (*)
+        // zs[l-1] is in other words not correct
+        Vector *f_prim = linalg_vector_map(nn->zs[l], nn->activation_derivative);
+
+        // delta^l = (W^{l})^T * delta^{l+1} ∘ f'(z^l)
+        Vector *new_delta = linalg_vector_hadamard(intermediate, f_prim);
+
+        // del L/del b = delta_l = grad_b for layer l
+        // First iter: l = L - 1 = num_layers -1 -1 = num_layers - 2
+        //             l - 1 = num_layers - 3 (final element of grad_b has index num_layers - 2)
+        linalg_vector_copy_into(grad_b[l - 1], new_delta);
+
+        // del L/del W^l = delta_l x a^(l-1) = grad_w for layer l
+        Matrix *grad_w_l = linalg_vector_outer_prod(new_delta, nn->activations[l - 1]);
+        linalg_matrix_copy_into(grad_w[l - 1], grad_w_l);
+
+        linalg_vector_free(delta);
+        linalg_vector_free(intermediate);
+        linalg_matrix_free(w_l_transpose);
+        linalg_vector_free(f_prim);
+        linalg_matrix_free(grad_w_l);
+
+        // Careful...
+        delta = new_delta; // move down one layer
+    }
+
+    linalg_vector_free(delta);
+    linalg_vector_free(y_hat);
 }
 
 void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, float learning_rate)
 {
 }
 
-void neuralnet_train(NeuralNet *nn, const Vector **inputs)
+// TODO: Change from mnist to input and target to make it more general
+void neuralnet_train(NeuralNet *nn, Mnist *mnist)
 {
     // Shuffle data each epoch
     // Allocate gradients once per epoch
     // Validation loss -> early stopping
+
+    // ---- Allocate grads for w and b exactly as nn->weights and biases ----
+    // TODO: Move this to neuralnet_create()
+    // TODO: Refactor so that grads are held by the struct
+    // Alloc grad weights
+    Matrix **grad_w = (Matrix **)calloc(nn->num_layers - 1, sizeof(Matrix *));
+
+    // Alloc grad biases
+    Vector **grad_b = (Vector **)calloc(nn->num_layers - 1, sizeof(Vector *));
+
+    if (!grad_w || !grad_b)
+    {
+        perror("calloc NeuralNet grad_w grad_b");
+        free(grad_w);
+        free(grad_b);
+        exit(EXIT_FAILURE);
+    }
+
+    // Number of weight matrices is 1 less than number of layers
+    // length of layer_sizes = num_layers
+    for (int i = 0; i < nn->num_layers - 1; ++i)
+    {
+        // If layer 0 has 2 neurons and layer 1 has 5 neurons, then we have
+        // Matrix_5x2
+        // [   1.079    0.542 ]
+        // [   0.646   -0.197 ]
+        // [   1.225    0.848 ]
+        // [  -0.157   -1.124 ]
+        // [   0.575    0.346 ]
+        // That is, row 1 holds the incoming weights for neuron 1 in layer 1, and so on
+        grad_w[i] = linalg_matrix_create(nn->layer_sizes[i + 1], nn->layer_sizes[i]);
+        grad_b[i] = linalg_vector_create(nn->layer_sizes[i + 1]);
+    }
+
+    Vector *target = linalg_vector_create(nn->layer_output_size);
+    linalg_vector_fill(target, 0.0f);
+    target->data[mnist->labels[0]] = 1.0f; // free?
+
+    neuralnet_forward(nn, mnist->images[0]);
+    neuralnet_backprop(nn, target, grad_w, grad_b); // seems to work
 }
 
-void neuralnet_test(NeuralNet *nn, const Vector **inputs)
+void neuralnet_test(NeuralNet *nn, const Vector **inputs, const Vector **targets)
 {
 }
 

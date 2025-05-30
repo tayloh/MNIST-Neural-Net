@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     mnist_load_labels(mnist, "./mnist-dataset/t10k-labels.idx1-ubyte");
     mnist_print_image_x(mnist, MNIST_NUM_TEST - 1);
 
-    int nn_layers[5] = {MNIST_IMAGE_SIZE, 2, 5, 5, 10};
+    int nn_layers[5] = {MNIST_IMAGE_SIZE, 2, 5, 8, 10};
     NeuralNet *nn = neuralnet_create(5, nn_layers);
     neuralnet_set_activation(nn, ReLU);
     neuralnet_set_activation_derivative(nn, ReLU_derivative);
@@ -108,6 +108,8 @@ int main(int argc, char **argv)
     linalg_vector_fill(target, 0.0f);
     target->data[mnist->labels[MNIST_NUM_TEST - 1]] = 1.0f;
     printf("Loss: %.3f", neuralnet_compute_softmax_CE(nn->zs[nn->num_layers - 1], target));
+
+    neuralnet_train(nn, mnist);
 
     linalg_vector_free(target);
     mnist_free(mnist);
