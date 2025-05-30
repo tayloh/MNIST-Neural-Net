@@ -72,7 +72,7 @@ void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Ve
 void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, float learning_rate); // TODO
 
 // Use cross-entropy since MNIST is a classification task
-float neuralnet_compute_CE(const Vector *output, const Vector *target); // TODO
+float neuralnet_compute_softmax_CE(const Vector *output, const Vector *target);
 
 void neuralnet_print(const NeuralNet *nn);
 void neuralnet_print_layer(const NeuralNet *nn, int layer_index);

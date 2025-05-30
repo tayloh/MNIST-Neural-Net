@@ -320,6 +320,39 @@ void neuralnet_forward(NeuralNet *nn, const Vector *input)
     }
 }
 
+float neuralnet_compute_softmax_CE(const Vector *output, const Vector *target)
+{
+    // Cross-entropy measures the difference between two probability distributions:
+    //     The true distribution (your labels)
+    //     The predicted distribution (your model's output)
+    // For classification with a one-hot encoded label y and a predicted softmax output y^​, the cross-entropy is:
+    // CE(y,y^)=−∑_i yi log⁡(y^i)
+    // Since y is one-hot (e.g., 0, 0, 0, 1, 0), only one term matters:
+    // CE=−log⁡(y^true class)
+    // So it just penalizes how wrong the probability is for the correct class.
+
+    if (!output || !target || !output->data || !target->data || output->size != target->size)
+    {
+        fprintf(stderr, "Error: neuralnet_compute_softmax_CE invalid input");
+        exit(EXIT_FAILURE);
+    }
+
+    Vector *output_softmax = softmax(output);
+
+    float loss = 0;
+    for (int i = 0; i < target->size; ++i)
+    {
+        // Note: Will be mult by 0 for all but one target->data[i] (the one 1)
+        loss += output_softmax->data[i] * target->data[i];
+    }
+
+    loss = -logf(loss);
+
+    linalg_vector_free(output_softmax);
+
+    return loss;
+}
+
 void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Vector **grad_b)
 {
     // Do this slowly and make sure you understand the math in each step...

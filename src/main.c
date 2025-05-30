@@ -103,8 +103,13 @@ int main(int argc, char **argv)
     neuralnet_print_layer(nn, 2);
 
     int inferred_value = neuralnet_infer(nn, mnist->images[MNIST_NUM_TEST - 1]);
-    printf("NeuralNet inferred %d", inferred_value);
+    printf("NeuralNet inferred %d\n", inferred_value);
+    Vector *target = linalg_vector_create(10);
+    linalg_vector_fill(target, 0.0f);
+    target->data[mnist->labels[MNIST_NUM_TEST - 1]] = 1.0f;
+    printf("Loss: %.3f", neuralnet_compute_softmax_CE(nn->zs[nn->num_layers - 1], target));
 
+    linalg_vector_free(target);
     mnist_free(mnist);
     neuralnet_free(nn);
 
