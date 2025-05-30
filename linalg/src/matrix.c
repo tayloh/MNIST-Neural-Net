@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 Matrix *linalg_matrix_create(int rows, int columns)
 {
@@ -405,4 +406,28 @@ Vector *linalg_matrix_get_row(const Matrix *m, int row)
         result->data[i] = m->data[row][i];
     }
     return result;
+}
+
+void linalg_matrix_copy_into(Matrix *a, const Matrix *b)
+{
+    if (!a || !a->data)
+    {
+        fprintf(stderr, "Error: matrix_copy_into a NULL matrix");
+        exit(EXIT_FAILURE);
+    }
+    if (!b || !b->data)
+    {
+        fprintf(stderr, "Error: matrix_copy_into b NULL matrix");
+        exit(EXIT_FAILURE);
+    }
+    if (a->rows != b->rows || a->columns != b->columns)
+    {
+        fprintf(stderr, "Error: matrix_copy_into dimesions mismatch");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < b->rows; ++i)
+    {
+        memcpy(a->data[i], b->data[i], b->columns * sizeof(float));
+    }
 }

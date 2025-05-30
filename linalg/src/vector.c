@@ -408,3 +408,51 @@ float linalg_vector_max(const Vector *v)
 
     return max;
 }
+
+Matrix *linalg_vector_outer_prod(const Vector *a, const Vector *b)
+{
+    if (!a || !a->data)
+    {
+        fprintf(stderr, "Error: vector_outer_prod a NULL vector");
+        exit(EXIT_FAILURE);
+    }
+    if (!b || !b->data)
+    {
+        fprintf(stderr, "Error: vector_outer_prod b NULL vector");
+        exit(EXIT_FAILURE);
+    }
+
+    Matrix *result = linalg_matrix_create(a->size, b->size);
+    for (int i = 0; i < result->rows; ++i)
+    {
+        for (int j = 0; j < result->columns; ++j)
+        {
+            result->data[i][j] = a->data[i] * b->data[j];
+        }
+    }
+
+    return result;
+}
+
+Vector *linalg_vector_map(const Vector *v, float (*func)(float))
+{
+    if (!v || !v->data)
+    {
+        fprintf(stderr, "Error: vector_map NULL vector");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!func)
+    {
+        fprintf(stderr, "Error: vector_map NULL func");
+        exit(EXIT_FAILURE);
+    }
+
+    Vector *result = linalg_vector_create(v->size);
+    for (int i = 0; i < v->size; ++i)
+    {
+        result->data[i] = func(v->data[i]);
+    }
+
+    return result;
+}

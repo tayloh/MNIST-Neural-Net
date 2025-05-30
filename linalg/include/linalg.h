@@ -36,6 +36,7 @@ float linalg_vector_dot(const Vector *a, const Vector *b);
 float linalg_vector_sum(const Vector *v);
 int linalg_vector_argmax(const Vector *v);
 float linalg_vector_max(const Vector *v);
+Matrix *linalg_vector_outer_prod(const Vector *a, const Vector *b);
 
 Vector *linalg_vector_add(const Vector *a, const Vector *b);
 void linalg_vector_add_into(Vector *a, const Vector *b);
@@ -44,6 +45,7 @@ Vector *linalg_vector_transform(const Matrix *m, const Vector *v);
 Vector *linalg_vector_hadamard(const Vector *a, const Vector *b);
 
 void linalg_vector_apply(Vector *v, float (*func)(float));
+Vector *linalg_vector_map(const Vector *v, float (*func)(float));
 
 // ---------------------
 // MATRIX
@@ -51,6 +53,7 @@ void linalg_vector_apply(Vector *v, float (*func)(float));
 
 Matrix *linalg_matrix_create(int rows, int columns);
 Matrix *linalg_matrix_copy(const Matrix *m);
+void linalg_matrix_copy_into(Matrix *a, const Matrix *b);
 Matrix *linalg_matrix_identity(int n);
 
 void linalg_matrix_free(Matrix *m);
