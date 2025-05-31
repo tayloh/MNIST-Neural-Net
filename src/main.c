@@ -7,12 +7,64 @@
 #include "mnist.h"
 #include "neuralnet.h"
 
+void random_experimentation();
+
+NeuralNet *mnist_nn_training_driver()
+{
+    // ---- Load Mnist datasets ----
+    printf("mnist_nn_training_driver: Starting training driver...\n");
+    printf("Loading training dataset...");
+    Mnist *mnist_train = mnist_create(MNIST_NUM_TRAIN);
+    mnist_load_images(mnist_train, "./mnist-dataset/train-images.idx3-ubyte");
+    mnist_load_labels(mnist_train, "./mnist-dataset/train-labels.idx1-ubyte");
+    printf(" done!\n");
+
+    printf("Loading testing dataset...");
+    Mnist *mnist_test = mnist_create(MNIST_NUM_TEST);
+    mnist_load_images(mnist_test, "./mnist-dataset/t10k-images.idx3-ubyte");
+    mnist_load_labels(mnist_test, "./mnist-dataset/t10k-labels.idx1-ubyte");
+    printf(" done!\n");
+
+    // ---- Init neuralnet ----
+    printf("Allocating neuralnet...");
+    int layer_sizes[] = {784, 512, 256, 10};
+    NeuralNet *nn = neuralnet_create(4, layer_sizes);
+    neuralnet_set_activation(nn, ReLU);
+    neuralnet_set_activation_derivative(nn, ReLU_derivative);
+    printf(" done!\n");
+    neuralnet_print(nn);
+
+    // ---- Train and test neuralnet ----
+    float learning_rate = 0.01f;
+    int epochs = 10;
+
+    // todo: synthesize targets_train and targets_test (they need to be vectors not uint8)
+    // neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, learning_rate, epochs);
+    // neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
+
+    // Free
+    mnist_free(mnist_train);
+    mnist_free(mnist_test);
+
+    return nn;
+}
+
 int main(int argc, char **argv)
+{
+
+    mnist_nn_training_driver();
+    // random_experimentation();
+
+    return 0;
+}
+
+void random_experimentation()
 {
     printf("MNIST Neural net\n");
 
     srand(time(NULL));
 
+    // LINALG
     Vector *v1 = linalg_vector_create(3);
     Vector *v2 = linalg_vector_create(3);
 
@@ -87,11 +139,13 @@ int main(int argc, char **argv)
 
     linalg_matrix_free(I3);
 
+    // MNIST
     Mnist *mnist = mnist_create(MNIST_NUM_TEST);
     mnist_load_images(mnist, "./mnist-dataset/t10k-images.idx3-ubyte");
     mnist_load_labels(mnist, "./mnist-dataset/t10k-labels.idx1-ubyte");
     mnist_print_image_x(mnist, MNIST_NUM_TEST - 1);
 
+    // NEURALNET
     int nn_layers[5] = {MNIST_IMAGE_SIZE, 2, 5, 8, 10};
     NeuralNet *nn = neuralnet_create(5, nn_layers);
     neuralnet_set_activation(nn, ReLU);
@@ -109,11 +163,9 @@ int main(int argc, char **argv)
     target->data[mnist->labels[MNIST_NUM_TEST - 1]] = 1.0f;
     printf("Loss: %.3f", neuralnet_compute_softmax_CE(nn->zs[nn->num_layers - 1], target));
 
-    neuralnet_train(nn, mnist);
+    // neuralnet_train(nn, mnist);
 
     linalg_vector_free(target);
     mnist_free(mnist);
     neuralnet_free(nn);
-
-    return 0;
 }
