@@ -1,4 +1,5 @@
 #include "neuralnet.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,12 +103,9 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
     nn->activation = NULL;
     nn->activation_derivative = NULL;
 
-    // Alloc Weights
+    // ----- Alloc weights and biases -----
     nn->weights = (Matrix **)calloc(num_layers - 1, sizeof(Matrix *));
-
-    // Alloc biases
     nn->biases = (Vector **)calloc(num_layers - 1, sizeof(Vector *));
-
     if (!nn->weights || !nn->biases)
     {
         perror("calloc NeuralNet weights/biases");
@@ -116,7 +114,6 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
         free(nn);
         exit(EXIT_FAILURE);
     }
-
     // Number of weight matrices is 1 less than number of layers
     // length of layer_sizes = num_layers
     for (int i = 0; i < num_layers - 1; ++i)
@@ -133,12 +130,28 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
         nn->biases[i] = linalg_vector_create(layer_sizes[i + 1]);
     }
 
+    // ----- Alloc grad_w and grad_b -----
+    // Alloc grad_w and grad_b (they need to be exact same size as weights and biases resp.)
+    nn->grad_w = (Matrix **)calloc(num_layers - 1, sizeof(Matrix *));
+    nn->grad_b = (Vector **)calloc(num_layers - 1, sizeof(Vector *));
+    if (!nn->grad_w || !nn->grad_b)
+    {
+        perror("calloc NeuralNet grad_w grad_b");
+        free(nn->grad_w);
+        free(nn->grad_b);
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < num_layers - 1; ++i)
+    {
+        nn->grad_w[i] = linalg_matrix_create(layer_sizes[i + 1], layer_sizes[i]);
+        nn->grad_b[i] = linalg_vector_create(layer_sizes[i + 1]);
+    }
+
+    // ----- Alloc activations (a) and pre-activaions (zs) -----
     // Alloc activations
     nn->activations = (Vector **)calloc(num_layers, sizeof(Vector *));
-
     // Alloc pre activations
     nn->zs = (Vector **)calloc(num_layers, sizeof(Vector *));
-
     if (!nn->activations || !nn->zs)
     {
         perror("calloc NeuralNet activations/zs");
@@ -147,7 +160,6 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
         free(nn);
         exit(EXIT_FAILURE);
     }
-
     for (int i = 0; i < num_layers; ++i)
     {
         nn->activations[i] = linalg_vector_create(layer_sizes[i]);
@@ -353,9 +365,9 @@ float neuralnet_compute_softmax_CE(const Vector *output, const Vector *target)
     return loss;
 }
 
-void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Vector **grad_b)
+void neuralnet_backprop(NeuralNet *nn, const Vector *target)
 {
-    // TODO: Make sure this works...
+    // TODO: Make sure this works... and do the common error checks...
 
     // --------- OUTPUT LAYER ---------
     // Output layer index
@@ -376,14 +388,14 @@ void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Ve
     // Where del L/del z = a^L - y = delta (vector above)
     // and del z/del b where z = W^l * a^(l-1) + b^l is just = 1 (first term is constant in terms of b)
     // => del L del b = delta * 1
-    linalg_vector_copy_into(grad_b[L - 1], delta);
+    linalg_vector_copy_into(nn->grad_b[L - 1], delta);
 
     // del L/del W^L = del L/del z * del z/del W^L = delta x a^(L-1) (outer product)
     // del z/del W^L = a^(L-1) (see backprop.md why)
     // grad_w_L is a matrix of size |delta| x |a^(L-1)| (so we have a gradient for each ingoing weight in the layer)
     // this is how it must be
     Matrix *grad_w_L = linalg_vector_outer_prod(delta, nn->activations[L - 1]);
-    linalg_matrix_copy_into(grad_w[L - 1], grad_w_L);
+    linalg_matrix_copy_into(nn->grad_w[L - 1], grad_w_L);
     linalg_matrix_free(grad_w_L);
 
     // --------- HIDDEN LAYERS ---------
@@ -398,6 +410,8 @@ void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Ve
         // delta_(l-1) =  f'( z^(l-1) ) hadamard (W^l)^t * delta_l (*)
 
         // intermediate term = (W^l)^t * delta_l
+        // weights[0] will never run here
+        // layer 0 has no delta (no error signal for input layer, obviously)
         Matrix *w_l_transpose = linalg_matrix_transpose(nn->weights[l]);
         Vector *intermediate = linalg_vector_transform(w_l_transpose, delta);
 
@@ -412,11 +426,11 @@ void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Ve
         // del L/del b = delta_l = grad_b for layer l
         // First iter: l = L - 1 = num_layers -1 -1 = num_layers - 2
         //             l - 1 = num_layers - 3 (final element of grad_b has index num_layers - 2)
-        linalg_vector_copy_into(grad_b[l - 1], new_delta);
+        linalg_vector_copy_into(nn->grad_b[l - 1], new_delta);
 
         // del L/del W^l = delta_l x a^(l-1) = grad_w for layer l
         Matrix *grad_w_l = linalg_vector_outer_prod(new_delta, nn->activations[l - 1]);
-        linalg_matrix_copy_into(grad_w[l - 1], grad_w_l);
+        linalg_matrix_copy_into(nn->grad_w[l - 1], grad_w_l);
 
         linalg_vector_free(delta);
         linalg_vector_free(intermediate);
@@ -432,60 +446,134 @@ void neuralnet_backprop(NeuralNet *nn, const Vector *target, Matrix **grad_w, Ve
     linalg_vector_free(y_hat);
 }
 
-void neuralnet_update_weights(NeuralNet *nn, Matrix **grad_w, Vector **grad_b, float learning_rate)
+void neuralnet_update_w_b(NeuralNet *nn, float learning_rate)
 {
-}
-
-// TODO: Change from mnist to input and target to make it more general
-void neuralnet_train(NeuralNet *nn, Mnist *mnist)
-{
-    // Shuffle data each epoch
-    // Allocate gradients once per epoch
-    // Validation loss -> early stopping
-
-    // ---- Allocate grads for w and b exactly as nn->weights and biases ----
-    // TODO: Move this to neuralnet_create()
-    // TODO: Refactor so that grads are held by the struct
-    // Alloc grad weights
-    Matrix **grad_w = (Matrix **)calloc(nn->num_layers - 1, sizeof(Matrix *));
-
-    // Alloc grad biases
-    Vector **grad_b = (Vector **)calloc(nn->num_layers - 1, sizeof(Vector *));
-
-    if (!grad_w || !grad_b)
+    if (!nn)
     {
-        perror("calloc NeuralNet grad_w grad_b");
-        free(grad_w);
-        free(grad_b);
+        fprintf(stderr, "Error: neuralnet_update_w_b NULL nn");
         exit(EXIT_FAILURE);
     }
 
-    // Number of weight matrices is 1 less than number of layers
-    // length of layer_sizes = num_layers
-    for (int i = 0; i < nn->num_layers - 1; ++i)
+    int L = nn->num_layers - 1;
+    for (int l = 0; l < L; ++l)
     {
-        // If layer 0 has 2 neurons and layer 1 has 5 neurons, then we have
-        // Matrix_5x2
-        // [   1.079    0.542 ]
-        // [   0.646   -0.197 ]
-        // [   1.225    0.848 ]
-        // [  -0.157   -1.124 ]
-        // [   0.575    0.346 ]
-        // That is, row 1 holds the incoming weights for neuron 1 in layer 1, and so on
-        grad_w[i] = linalg_matrix_create(nn->layer_sizes[i + 1], nn->layer_sizes[i]);
-        grad_b[i] = linalg_vector_create(nn->layer_sizes[i + 1]);
+        int layer_size = nn->layer_sizes[l + 1];
+
+        // Update biases and weights between layer l and l+1
+        for (int i = 0; i < layer_size; ++i)
+        {
+            nn->biases[l]->data[i] -= learning_rate * nn->grad_b[l]->data[i];
+
+            int prev_layer_size = nn->layer_sizes[l];
+            for (int j = 0; j < prev_layer_size; ++j)
+            {
+                nn->weights[l]->data[i][j] -= learning_rate * nn->grad_w[l]->data[i][j];
+            }
+        }
     }
-
-    Vector *target = linalg_vector_create(nn->layer_output_size);
-    linalg_vector_fill(target, 0.0f);
-    target->data[mnist->labels[0]] = 1.0f; // free?
-
-    neuralnet_forward(nn, mnist->images[0]);
-    neuralnet_backprop(nn, target, grad_w, grad_b); // seems to work
 }
 
-void neuralnet_test(NeuralNet *nn, const Vector **inputs, const Vector **targets)
+void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int epochs)
 {
+    // cba to check everything here...
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_train NULL nn");
+        exit(EXIT_FAILURE);
+    }
+    // At least check members that don't get set in create()
+    if (!nn->activation)
+    {
+        fprintf(stderr, "Error: neuralnet_train activation function is not set");
+        exit(EXIT_FAILURE);
+    }
+    if (!nn->activation_derivative)
+    {
+        fprintf(stderr, "Error: neuralnet_train activation function derivative is not set");
+        exit(EXIT_FAILURE);
+    }
+
+    // Things to consider later TODO:
+    // Shuffle data each epoch to reduce overfit/improve convergence
+    // Validation loss -> early stopping
+    // Print epoch time and learning rate
+
+    printf("neuralnet_train: Started training...\n");
+
+    for (int e = 0; e < epochs; ++e)
+    {
+        int cursor_row = get_current_cursor_row();
+        printf("---Epoch %d---\n", e);
+
+        float total_epoch_loss = 0.0f;
+
+        for (int i = 0; i < num_samples; ++i)
+        {
+            // Feed forward
+            neuralnet_forward(nn, inputs[i]);
+            // ---
+
+            // Get the raw logits at the output layer
+            Vector *output_layer_logits = nn->zs[nn->num_layers - 1];
+
+            float loss = neuralnet_compute_softmax_CE(output_layer_logits, targets[i]);
+            total_epoch_loss += loss;
+
+            // Backpropagation
+            neuralnet_backprop(nn, targets[i]);
+            neuralnet_update_w_b(nn, learning_rate);
+            // ---
+
+            int percentage = (i + 1) * 100 / num_samples;
+            draw_progress_bar(percentage, cursor_row + 1);
+        }
+
+        // Log loss after each epoch
+        float avg_epoch_loss = total_epoch_loss / num_samples;
+        printf("\nLoss: %.3f\n", avg_epoch_loss);
+    }
+
+    printf("neuralnet_train: Done training.");
+}
+
+void neuralnet_test(NeuralNet *nn, const Vector **inputs, const Vector **targets, int num_samples)
+{
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_test NULL nn");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("neuralnet_test: Testing started...\n");
+
+    // Calculate both loss and percentage correct guesses
+    int correct_predictions = 0;
+    float total_loss = 0;
+    for (int i = 0; i < num_samples; ++i)
+    {
+        // Run an inference cycle (includes forward pass)
+        int prediction = neuralnet_infer(nn, inputs[i]);
+
+        // Get index for the 1 in the one-hot target vector
+        int target = linalg_vector_argmax(targets[i]);
+
+        if (prediction == target)
+        {
+            correct_predictions++;
+        }
+
+        // Compute softmax CE
+        Vector *output_layer_logits = nn->zs[nn->num_layers - 1];
+        float loss = neuralnet_compute_softmax_CE(output_layer_logits, targets[i]);
+        total_loss += loss;
+    }
+    float accuracy = (correct_predictions * 100.0f) / num_samples;
+    float average_loss = total_loss / num_samples;
+
+    printf("Results:\n");
+    printf("Average loss: %.3f\n", average_loss);
+    printf("Accuracy: %.2f%% (%d/%d correct)\n", accuracy, correct_predictions, num_samples);
+    printf("neuralnet_test: Testing done.\n");
 }
 
 void neuralnet_print_layer(const NeuralNet *nn, int layer_index)
