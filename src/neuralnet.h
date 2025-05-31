@@ -33,6 +33,9 @@ typedef struct
     Matrix **grad_w;
     Vector **grad_b;
 
+    // Track if weights biases init has been called
+    int init_called;
+
 } NeuralNet;
 
 // Layer 0 ------------ No biases
@@ -68,15 +71,15 @@ float ReLU_derivative(float x);
 void neuralnet_init_w_b_he(NeuralNet *nn);
 
 // inputs and targets are not altered inside of these functions
-void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int epochs); // test
-void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples);                                   // test
+void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int max_epochs, float lambda, int patience);
+void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples);
 
 int neuralnet_infer(NeuralNet *nn, const Vector *input);
 
 void neuralnet_forward(NeuralNet *nn, const Vector *input);
 
-void neuralnet_backprop(NeuralNet *nn, const Vector *target);  // Should be ok
-void neuralnet_update_w_b(NeuralNet *nn, float learning_rate); // Should be ok
+void neuralnet_backprop(NeuralNet *nn, const Vector *target);
+void neuralnet_update_w_b(NeuralNet *nn, float learning_rate, float lambda);
 
 // Use cross-entropy since MNIST is a classification task
 float neuralnet_compute_softmax_CE(const Vector *output, const Vector *target);

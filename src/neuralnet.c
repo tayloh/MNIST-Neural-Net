@@ -6,6 +6,24 @@
 #include <math.h>
 #include <time.h>
 
+static void swap_vectors(Vector **a, Vector **b)
+{
+    Vector *temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// Fisher-Yates shuffle
+static void shuffle_data(Vector **inputs, Vector **targets, int num_samples)
+{
+    for (int i = num_samples - 1; i > 0; --i)
+    {
+        int j = rand() % (i + 1);
+        swap_vectors(&inputs[i], &inputs[j]);
+        swap_vectors(&targets[i], &targets[j]);
+    }
+}
+
 // Returns a random float from sampled form a standard normal distribution (mean = 0, stddev = 1)
 static float box_muller_sample()
 {
@@ -94,6 +112,7 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
         exit(EXIT_FAILURE);
     }
 
+    nn->init_called = 0;
     nn->num_layers = num_layers;
     nn->layer_input_size = layer_sizes[0];
     nn->layer_output_size = layer_sizes[num_layers - 1];
@@ -268,6 +287,8 @@ void neuralnet_init_w_b_he(NeuralNet *nn)
         // Zero initialize biases
         linalg_vector_fill(nn->biases[i], 0.0f);
     }
+
+    nn->init_called = 1;
 }
 
 int neuralnet_infer(NeuralNet *nn, const Vector *input)
@@ -447,7 +468,7 @@ void neuralnet_backprop(NeuralNet *nn, const Vector *target)
     linalg_vector_free(y_hat);
 }
 
-void neuralnet_update_w_b(NeuralNet *nn, float learning_rate)
+void neuralnet_update_w_b(NeuralNet *nn, float learning_rate, float lambda)
 {
     if (!nn)
     {
@@ -468,13 +489,14 @@ void neuralnet_update_w_b(NeuralNet *nn, float learning_rate)
             int prev_layer_size = nn->layer_sizes[l];
             for (int j = 0; j < prev_layer_size; ++j)
             {
-                nn->weights[l]->data[i][j] -= learning_rate * nn->grad_w[l]->data[i][j];
+                // Weight decay: lambda * nn->weights[l]->data[i][j]
+                nn->weights[l]->data[i][j] -= learning_rate * (nn->grad_w[l]->data[i][j] + lambda * nn->weights[l]->data[i][j]);
             }
         }
     }
 }
 
-void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int epochs)
+void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int max_epochs, float lambda, int patience)
 {
     // cba to check everything here...
     if (!nn)
@@ -493,21 +515,31 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
         fprintf(stderr, "Error: neuralnet_train activation function derivative is not set");
         exit(EXIT_FAILURE);
     }
+    if (!nn->init_called)
+    {
+        // Thought my implementation was broken for half an hour
+        printf("Warning: weights and biases have not been initialized");
+    }
 
     // Things to consider later TODO:
-    // Shuffle data each epoch to reduce overfit/improve convergence
     // Validation loss -> early stopping
-    // Print epoch time and learning rate
 
-    printf("neuralnet_train: Started training...\n");
-    for (int e = 0; e < epochs; ++e)
+    printf("neuralnet_train: Started training...\n\n");
+    neuralnet_print(nn);
+    printf("num_samples                = %d\n", num_samples);
+    printf("learning_rate              = %.5f\n", learning_rate);
+    printf("max_epochs                 = %d\n", max_epochs);
+    printf("lambda (weight decay)      = %.5f\n", lambda);
+    printf("patience (validation loss) = %d\n", patience);
+    for (int e = 0; e < max_epochs; ++e)
     {
         printf("\n---Epoch %d---\n", e);
+
+        shuffle_data(inputs, targets, num_samples);
 
         float total_epoch_loss = 0.0f;
 
         time_t epoch_start_time = time(NULL);
-
         int cursor_row = get_current_cursor_row();
         int last_percentage = -1;
 
@@ -520,6 +552,7 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
             //  ---
 
             // Get the raw logits at the output layer
+            // Softmax-CE expects raw logits (applying ReLU first distorts the relative score between classes)
             Vector *output_layer_logits = nn->zs[nn->num_layers - 1];
 
             float loss = neuralnet_compute_softmax_CE(output_layer_logits, targets[i]);
@@ -527,7 +560,7 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
 
             // Backpropagation
             neuralnet_backprop(nn, targets[i]);
-            neuralnet_update_w_b(nn, learning_rate);
+            neuralnet_update_w_b(nn, learning_rate, lambda);
             //  ---
 
             // Only update progress bar if percentage changed

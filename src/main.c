@@ -7,8 +7,6 @@
 #include "mnist.h"
 #include "neuralnet.h"
 
-void random_experimentation();
-
 void mnist_nn_training_driver()
 {
     // ---- Load Mnist datasets ----
@@ -28,22 +26,40 @@ void mnist_nn_training_driver()
     // ---- Init neuralnet ----
     printf("Allocating neuralnet...");
 
-    // Best config I've found so far is layer_sizes = {784, 256, 10}, lr=0.01
-    // CONFIG
+    // EDIT NEURALNET AND LEARNING PARAMETERS HERE
+
+    // Best config I've found so far is
+    // layer_sizes = {784, 256, 10}
+    // learnin_rate = 0.01f
+    // lambda/l2/weight decay = 0 (but for generalization, I guess pick 0.0001f)
+    // patience = 3
+    // epochs = 10
+
+    // activation function: ReLU
+    // loss function: Cross-Entropy
+    // initialization: He
+
+    // => Best accuracy on test dataset: 98.4 %
+    srand((unsigned)time(NULL));
     int layer_sizes[] = {784, 256, 10};
-    NeuralNet *nn = neuralnet_create(3, layer_sizes);
+    float learning_rate = 0.01f;
+    float lambda = 0.0001f;
+    int patience = 3;
+    int max_epochs = 10;
+
+    int num_layers = sizeof(layer_sizes) / sizeof(layer_sizes[0]);
+    NeuralNet *nn = neuralnet_create(num_layers, layer_sizes);
     neuralnet_set_activation(nn, ReLU);
     neuralnet_set_activation_derivative(nn, ReLU_derivative);
     neuralnet_init_w_b_he(nn);
-    printf(" done!\n");
-    neuralnet_print(nn);
-    printf("\n");
 
-    // ---- Train and test neuralnet ----
+    printf(" done!\n");
+    printf("\n");
 
     // Synthesize targets from the mnist structs
     // mnist stores labels as uint8, but nn expects each target to be a vector with the samme size
     // as its output layer
+    // ----------------------------------
     Vector **targets_train = (Vector **)calloc(MNIST_NUM_TRAIN, sizeof(Vector *));
     Vector **targets_test = (Vector **)calloc(MNIST_NUM_TEST, sizeof(Vector *));
     if (!targets_train || !targets_test)
@@ -69,13 +85,10 @@ void mnist_nn_training_driver()
         int onehot_index = mnist_test->labels[i];
         targets_test[i]->data[onehot_index] = 1.0f;
     }
+    // ----------------------------------
 
-    // CONFIG
-    float learning_rate = 0.01f;
-    int epochs = 2;
-
-    // Train and test the network
-    neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, learning_rate, epochs);
+    // ---- Train and test neuralnet ----
+    neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, learning_rate, max_epochs, lambda, patience);
     printf("\n");
     neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
 
@@ -83,7 +96,7 @@ void mnist_nn_training_driver()
     //
     //
 
-    // Free train/test
+    // ---- Free train/test ----
     for (int i = 0; i < MNIST_NUM_TRAIN; ++i)
     {
         linalg_vector_free(targets_train[i]);
@@ -95,7 +108,7 @@ void mnist_nn_training_driver()
     free(targets_train);
     free(targets_test);
 
-    // Free other
+    // ---- Free other ----
     mnist_free(mnist_train);
     mnist_free(mnist_test);
     neuralnet_free(nn);
@@ -103,18 +116,17 @@ void mnist_nn_training_driver()
     // return nn;
 }
 
+void random_experimentation();
+
 int main(int argc, char **argv)
 {
-
     mnist_nn_training_driver();
-    // random_experimentation();
 
     return 0;
 }
 
 void random_experimentation()
 {
-    printf("MNIST Neural net\n");
 
     srand(time(NULL));
 
