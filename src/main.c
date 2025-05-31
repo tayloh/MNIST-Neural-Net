@@ -30,10 +30,10 @@ void mnist_nn_training_driver()
 
     // Best config I've found so far is
     // layer_sizes = {784, 256, 10}
-    // learnin_rate = 0.01f
+    // learning_rate = 0.01f
     // lambda/l2/weight decay = 0 (but for generalization, I guess pick 0.0001f)
     // patience = 3
-    // epochs = 10
+    // epochs = 30
 
     // activation function: ReLU
     // loss function: Cross-Entropy

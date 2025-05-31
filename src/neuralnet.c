@@ -574,6 +574,7 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
             neuralnet_backprop(nn, targets[i]);
             neuralnet_update_w_b(nn, learning_rate, lambda);
             //  ---
+            // neuralnet_print_layer(nn, nn->num_layers - 1);
 
             // Only update progress bar if percentage changed
             int percentage = (i + 1) * 100 / num_train_samples;
@@ -675,13 +676,11 @@ void neuralnet_print_layer(const NeuralNet *nn, int layer_index)
         fprintf(stderr, "Error: neuralnet_print NULL neuralnet");
         exit(EXIT_FAILURE);
     }
-
     if (layer_index >= nn->num_layers)
     {
         fprintf(stderr, "Error: neuralnet_print_layer layer_index out of bounds");
         exit(EXIT_FAILURE);
     }
-
     if (layer_index == 0)
     {
         printf("NeuralNet layer 0 (input) has no associated weights or biases");
@@ -689,8 +688,9 @@ void neuralnet_print_layer(const NeuralNet *nn, int layer_index)
     }
 
     printf("NeuralNet layer %d \n", layer_index);
-    printf("biases[%d] = %3.3f\n", layer_index - 1, nn->biases[layer_index - 1]);
     printf("weights[%d] = \n", layer_index - 1);
+    printf("biases[%d] = \n", layer_index - 1);
+    linalg_vector_print(nn->biases[layer_index - 1]);
     linalg_matrix_print(nn->weights[layer_index - 1]);
 }
 
