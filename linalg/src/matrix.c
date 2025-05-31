@@ -158,9 +158,10 @@ void linalg_matrix_add_scalar(Matrix *m, float scalar)
     }
 }
 
-// TODO: This is actually not that easy, I need GAUSS ELIM, implement if necessary
 Matrix *linalg_matrix_inverse(const Matrix *m)
 {
+    fprintf(stderr, "linalg_matrix_inverse is not implemented");
+    exit(EXIT_FAILURE);
 
     if (m->rows != m->columns)
     {
