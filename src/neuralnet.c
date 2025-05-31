@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 // Returns a random float from sampled form a standard normal distribution (mean = 0, stddev = 1)
 static float box_muller_sample()
@@ -499,19 +500,24 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
     // Print epoch time and learning rate
 
     printf("neuralnet_train: Started training...\n");
-
     for (int e = 0; e < epochs; ++e)
     {
-        int cursor_row = get_current_cursor_row();
-        printf("---Epoch %d---\n", e);
+        printf("\n---Epoch %d---\n", e);
 
         float total_epoch_loss = 0.0f;
 
+        time_t epoch_start_time = time(NULL);
+
+        int cursor_row = get_current_cursor_row();
+        int last_percentage = -1;
+
         for (int i = 0; i < num_samples; ++i)
         {
+            // clock_t start = clock();
+
             // Feed forward
             neuralnet_forward(nn, inputs[i]);
-            // ---
+            //  ---
 
             // Get the raw logits at the output layer
             Vector *output_layer_logits = nn->zs[nn->num_layers - 1];
@@ -522,21 +528,31 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
             // Backpropagation
             neuralnet_backprop(nn, targets[i]);
             neuralnet_update_w_b(nn, learning_rate);
-            // ---
+            //  ---
 
+            // Only update progress bar if percentage changed
             int percentage = (i + 1) * 100 / num_samples;
-            draw_progress_bar(percentage, cursor_row + 1);
+            if (percentage > last_percentage)
+            {
+                draw_progress_bar(percentage, cursor_row);
+                last_percentage = percentage;
+
+                printf(" %d s", time(NULL) - epoch_start_time);
+            }
+
+            // clock_t end = clock();
+            // printf("Single sample time: %.3f ms\n", 1000.0 * (end - start) / CLOCKS_PER_SEC);
         }
 
         // Log loss after each epoch
         float avg_epoch_loss = total_epoch_loss / num_samples;
-        printf("\nLoss: %.3f\n", avg_epoch_loss);
+        printf("\nAverage loss: %.3f\n", avg_epoch_loss);
     }
 
-    printf("neuralnet_train: Done training.");
+    printf("neuralnet_train: Training done!\n");
 }
 
-void neuralnet_test(NeuralNet *nn, const Vector **inputs, const Vector **targets, int num_samples)
+void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples)
 {
     if (!nn)
     {
@@ -570,10 +586,12 @@ void neuralnet_test(NeuralNet *nn, const Vector **inputs, const Vector **targets
     float accuracy = (correct_predictions * 100.0f) / num_samples;
     float average_loss = total_loss / num_samples;
 
-    printf("Results:\n");
+    printf("---\n");
+    printf("Results\n");
     printf("Average loss: %.3f\n", average_loss);
     printf("Accuracy: %.2f%% (%d/%d correct)\n", accuracy, correct_predictions, num_samples);
-    printf("neuralnet_test: Testing done.\n");
+    printf("---\n");
+    printf("neuralnet_test: Testing done!\n");
 }
 
 void neuralnet_print_layer(const NeuralNet *nn, int layer_index)

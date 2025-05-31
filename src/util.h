@@ -23,6 +23,7 @@ int get_current_cursor_row()
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
     return csbi.dwCursorPosition.Y;
 #endif
+    return 0;
 }
 
 void draw_progress_bar(int percentage, int row)

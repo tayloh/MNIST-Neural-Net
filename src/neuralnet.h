@@ -51,6 +51,9 @@ typedef struct
 
 // Layer num_layers - 1 (output layer) Biases biases[num_layers - 2]
 
+// TODO: look over what can be const and not
+
+// To setup, set_activation, set_activation_derivative, init_w_b
 NeuralNet *neuralnet_create(int num_layers, int *layer_sizes);
 void neuralnet_free(NeuralNet *nn);
 
@@ -64,8 +67,9 @@ float ReLU_derivative(float x);
 
 void neuralnet_init_w_b_he(NeuralNet *nn);
 
+// inputs and targets are not altered inside of these functions
 void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int epochs); // test
-void neuralnet_test(NeuralNet *nn, const Vector **inputs, const Vector **targets, int num_samples);                       // test
+void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples);                                   // test
 
 int neuralnet_infer(NeuralNet *nn, const Vector *input);
 

@@ -9,10 +9,10 @@
 
 void random_experimentation();
 
-NeuralNet *mnist_nn_training_driver()
+void mnist_nn_training_driver()
 {
     // ---- Load Mnist datasets ----
-    printf("mnist_nn_training_driver: Starting training driver...\n");
+    printf("mnist_nn_training_driver: Starting training driver...\n\n");
     printf("Loading training dataset...");
     Mnist *mnist_train = mnist_create(MNIST_NUM_TRAIN);
     mnist_load_images(mnist_train, "./mnist-dataset/train-images.idx3-ubyte");
@@ -23,30 +23,84 @@ NeuralNet *mnist_nn_training_driver()
     Mnist *mnist_test = mnist_create(MNIST_NUM_TEST);
     mnist_load_images(mnist_test, "./mnist-dataset/t10k-images.idx3-ubyte");
     mnist_load_labels(mnist_test, "./mnist-dataset/t10k-labels.idx1-ubyte");
-    printf(" done!\n");
+    printf(" done!\n\n");
 
     // ---- Init neuralnet ----
     printf("Allocating neuralnet...");
-    int layer_sizes[] = {784, 512, 256, 10};
-    NeuralNet *nn = neuralnet_create(4, layer_sizes);
+
+    // Best config I've found so far is layer_sizes = {784, 256, 10}, lr=0.01
+    // CONFIG
+    int layer_sizes[] = {784, 256, 10};
+    NeuralNet *nn = neuralnet_create(3, layer_sizes);
     neuralnet_set_activation(nn, ReLU);
     neuralnet_set_activation_derivative(nn, ReLU_derivative);
+    neuralnet_init_w_b_he(nn);
     printf(" done!\n");
     neuralnet_print(nn);
+    printf("\n");
 
     // ---- Train and test neuralnet ----
+
+    // Synthesize targets from the mnist structs
+    // mnist stores labels as uint8, but nn expects each target to be a vector with the samme size
+    // as its output layer
+    Vector **targets_train = (Vector **)calloc(MNIST_NUM_TRAIN, sizeof(Vector *));
+    Vector **targets_test = (Vector **)calloc(MNIST_NUM_TEST, sizeof(Vector *));
+    if (!targets_train || !targets_test)
+    {
+        perror("calloc train/test targets");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < MNIST_NUM_TRAIN; ++i)
+    {
+        // Create a one-hot vector for each target (element at index=label is set to 1)
+        targets_train[i] = linalg_vector_create(nn->layer_output_size);
+        linalg_vector_fill(targets_train[i], 0.0f);
+
+        int onehot_index = mnist_train->labels[i];
+        targets_train[i]->data[onehot_index] = 1.0f;
+    }
+    for (int i = 0; i < MNIST_NUM_TEST; ++i)
+    {
+        // Create a one-hot vector for each target (element at index=label is set to 1)
+        targets_test[i] = linalg_vector_create(nn->layer_output_size);
+        linalg_vector_fill(targets_test[i], 0.0f);
+
+        int onehot_index = mnist_test->labels[i];
+        targets_test[i]->data[onehot_index] = 1.0f;
+    }
+
+    // CONFIG
     float learning_rate = 0.01f;
-    int epochs = 10;
+    int epochs = 2;
 
-    // todo: synthesize targets_train and targets_test (they need to be vectors not uint8)
-    // neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, learning_rate, epochs);
-    // neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
+    // Train and test the network
+    neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, learning_rate, epochs);
+    printf("\n");
+    neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
 
-    // Free
+    //
+    //
+    //
+
+    // Free train/test
+    for (int i = 0; i < MNIST_NUM_TRAIN; ++i)
+    {
+        linalg_vector_free(targets_train[i]);
+    }
+    for (int i = 0; i < MNIST_NUM_TEST; ++i)
+    {
+        linalg_vector_free(targets_test[i]);
+    }
+    free(targets_train);
+    free(targets_test);
+
+    // Free other
     mnist_free(mnist_train);
     mnist_free(mnist_test);
+    neuralnet_free(nn);
 
-    return nn;
+    // return nn;
 }
 
 int main(int argc, char **argv)
