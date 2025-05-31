@@ -255,8 +255,17 @@ void neuralnet_load_model(NeuralNet *nn, const char *model_fp)
 {
 }
 
+void neuralnet_save_model(NeuralNet *nn, const char *model_fp)
+{
+    // File format something like
+    // First byte: number of layers L
+    // L next bytes: layer sizes
+    // float (4bytes) * layer sizes [0] ... float * layer sizes[L-2] next bytes: biases
+    // float * layer sizes [1] * layer sizes[0] next bytes: weights
+}
+
 // Initialize weights and biases using He initialization
-// FINAL: try with and without
+// Try with and without: without (random -1 to 1) converges much slower
 void neuralnet_init_w_b_he(NeuralNet *nn)
 {
     if (!nn)
@@ -344,7 +353,6 @@ void neuralnet_forward(NeuralNet *nn, const Vector *input)
         linalg_vector_copy_into(nn->activations[l + 1], z);
 
         // Don't use ReLU on the output layer (softmax CE needs raw logits)
-        // FINAL: look this over, try with and without
         if (l < nn->num_layers - 2)
         {
             linalg_vector_apply(nn->activations[l + 1], nn->activation);
@@ -389,8 +397,6 @@ float neuralnet_compute_softmax_CE(const Vector *output, const Vector *target)
 
 void neuralnet_backprop(NeuralNet *nn, const Vector *target)
 {
-    // TODO: Make sure this works... and do the common error checks...
-
     // --------- OUTPUT LAYER ---------
     // Output layer index
     int L = nn->num_layers - 1;
@@ -496,8 +502,9 @@ void neuralnet_update_w_b(NeuralNet *nn, float learning_rate, float lambda)
     }
 }
 
-void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, float learning_rate, int max_epochs, float lambda, int patience)
+void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples, int num_validation_samples, float learning_rate, int max_epochs, float lambda, int patience)
 {
+
     // cba to check everything here...
     if (!nn)
     {
@@ -521,21 +528,26 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
         printf("Warning: weights and biases have not been initialized");
     }
 
-    // Things to consider later TODO:
-    // Validation loss -> early stopping
+    int num_train_samples = num_samples - num_validation_samples;
 
     printf("neuralnet_train: Started training...\n\n");
     neuralnet_print(nn);
-    printf("num_samples                = %d\n", num_samples);
+    printf("num_train_samples          = %d\n", num_train_samples);
+    printf("num_validation_samples     = %d\n", num_validation_samples);
     printf("learning_rate              = %.5f\n", learning_rate);
     printf("max_epochs                 = %d\n", max_epochs);
     printf("lambda (weight decay)      = %.5f\n", lambda);
     printf("patience (validation loss) = %d\n", patience);
+
+    int epochs_without_improvement = 0;
+    float best_validation_loss = 10000.0f;
+    float current_validation_loss = 10000.0f;
+
     for (int e = 0; e < max_epochs; ++e)
     {
         printf("\n---Epoch %d---\n", e);
 
-        shuffle_data(inputs, targets, num_samples);
+        shuffle_data(inputs, targets, num_train_samples);
 
         float total_epoch_loss = 0.0f;
 
@@ -543,7 +555,7 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
         int cursor_row = get_current_cursor_row();
         int last_percentage = -1;
 
-        for (int i = 0; i < num_samples; ++i)
+        for (int i = 0; i < num_train_samples; ++i)
         {
             // clock_t start = clock();
 
@@ -564,7 +576,7 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
             //  ---
 
             // Only update progress bar if percentage changed
-            int percentage = (i + 1) * 100 / num_samples;
+            int percentage = (i + 1) * 100 / num_train_samples;
             if (percentage > last_percentage)
             {
                 draw_progress_bar(percentage, cursor_row);
@@ -576,13 +588,41 @@ void neuralnet_train(NeuralNet *nn, Vector **inputs, Vector **targets, int num_s
             // clock_t end = clock();
             // printf("Single sample time: %.3f ms\n", 1000.0 * (end - start) / CLOCKS_PER_SEC);
         }
+        // After each epoch, chech average loss, and check validation loss (also average)
+
+        // Compute loss on validation dataset
+        // Indices for validation samples start where training samples end:
+        for (int i = num_train_samples; i < num_train_samples + num_validation_samples; ++i)
+        {
+            // I think three places do this exact thing now.. code smell
+            neuralnet_forward(nn, inputs[i]);
+            Vector *output_layer_logits = nn->zs[nn->num_layers - 1];
+            float loss = neuralnet_compute_softmax_CE(output_layer_logits, targets[i]);
+            current_validation_loss += loss;
+        }
+        current_validation_loss /= num_validation_samples;
 
         // Log loss after each epoch
-        float avg_epoch_loss = total_epoch_loss / num_samples;
-        printf("\nAverage loss: %.3f\n", avg_epoch_loss);
-    }
+        float avg_epoch_loss = total_epoch_loss / num_train_samples;
+        printf("\nTraining loss: %.4f | Validation loss: %.4f\n", avg_epoch_loss, current_validation_loss);
 
-    printf("neuralnet_train: Training done!\n");
+        // Early stop if validation loss is higher than best loss after "patience" num epochs
+        if (current_validation_loss < best_validation_loss)
+        {
+            best_validation_loss = current_validation_loss;
+            epochs_without_improvement = 0;
+        }
+        else
+        {
+            epochs_without_improvement += 1;
+            if (epochs_without_improvement >= patience)
+            {
+                printf("\nValidation loss has not decreased for %d epochs, stopping...\n", patience);
+                break; // early stop
+            }
+        }
+    }
+    printf("\nneuralnet_train: Training done!\n");
 }
 
 void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_samples)
@@ -594,13 +634,14 @@ void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_sa
     }
 
     printf("neuralnet_test: Testing started...\n");
+    printf("%d samples\n", num_samples);
 
     // Calculate both loss and percentage correct guesses
     int correct_predictions = 0;
     float total_loss = 0;
     for (int i = 0; i < num_samples; ++i)
     {
-        // Run an inference cycle (includes forward pass)
+        // Run inference (includes forward pass)
         int prediction = neuralnet_infer(nn, inputs[i]);
 
         // Get index for the 1 in the one-hot target vector

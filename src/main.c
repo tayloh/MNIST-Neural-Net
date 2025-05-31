@@ -45,7 +45,8 @@ void mnist_nn_training_driver()
     float learning_rate = 0.01f;
     float lambda = 0.0001f;
     int patience = 3;
-    int max_epochs = 10;
+    int max_epochs = 30;
+    int num_validation_samples = 10000; // => ~ 70 15 15 train val test split
 
     int num_layers = sizeof(layer_sizes) / sizeof(layer_sizes[0]);
     NeuralNet *nn = neuralnet_create(num_layers, layer_sizes);
@@ -88,7 +89,7 @@ void mnist_nn_training_driver()
     // ----------------------------------
 
     // ---- Train and test neuralnet ----
-    neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, learning_rate, max_epochs, lambda, patience);
+    neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, num_validation_samples, learning_rate, max_epochs, lambda, patience);
     printf("\n");
     neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
 

@@ -1,3 +1,6 @@
+#ifndef UTIL_H
+#define UTIL_H
+
 #include <stdio.h>
 
 // Sigh...
@@ -56,3 +59,5 @@ void draw_progress_bar(int percentage, int row)
 //     }
 
 //     set_console_csr_xy(0, start_row + 1); // Move below progress bar
+
+#endif
