@@ -3,7 +3,7 @@
 This is a naive implementation of a feed forward neural net, for learning purposes.  
 Runs on CPU (single-thread), with stochastic gradient descent. Matrix/vector operations are not optimized. Allocs could be worse.  
 
-MNIST is a database with handwritten digits that are used to train and test image classification software.
+MNIST is a database of handwritten digits that are used to train and test image classification software.
 
 ## Run
 `gcc -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c linalg/src/vector.c linalg/src/matrix.c`
