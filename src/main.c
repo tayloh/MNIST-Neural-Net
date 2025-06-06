@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 #include "../linalg/include/linalg.h"
 #include "mnist.h"
@@ -45,8 +46,8 @@ void mnist_nn_training_driver()
     float learning_rate = 0.01f;
     float lambda = 0.0001f;
     int patience = 3;
-    int max_epochs = 30;
-    int num_validation_samples = 10000; // => ~ 70 15 15 train val test split
+    int max_epochs = 1;                 // 30
+    int num_validation_samples = 10000; // 10000 => ~ 70 15 15 train val test split
 
     int num_layers = sizeof(layer_sizes) / sizeof(layer_sizes[0]);
     NeuralNet *nn = neuralnet_create(num_layers, layer_sizes);
@@ -97,6 +98,16 @@ void mnist_nn_training_driver()
     //
     //
 
+    // This works now! nice, can build cli --train --test tomorrow
+    // TODO: function to read training parameters from file
+    // separate train and test into different functions here in main.c
+    neuralnet_save_model(nn, "testmodel");
+    NeuralNet *nn2 = neuralnet_load_model("testmodel");
+    neuralnet_set_activation(nn2, ReLU); // backprop is only run during train so no need to set it
+
+    neuralnet_print(nn2);
+    neuralnet_test(nn2, mnist_test->images, targets_test, MNIST_NUM_TEST);
+
     // ---- Free train/test ----
     for (int i = 0; i < MNIST_NUM_TRAIN; ++i)
     {
@@ -112,16 +123,139 @@ void mnist_nn_training_driver()
     // ---- Free other ----
     mnist_free(mnist_train);
     mnist_free(mnist_test);
+
     neuralnet_free(nn);
 
     // return nn;
+}
+
+void cli_train()
+{
+
+    // Read parameters file
+    // Train model
+    // Save model
+}
+
+void cli_test(const char *model_fp)
+{
+    // Read modelfile
+    printf("Loading modelfile...");
+
+    NeuralNet *nn = neuralnet_load_model(model_fp);
+    neuralnet_set_activation(nn, ReLU);
+
+    printf(" done!\n\n");
+    printf("Allocated ");
+    neuralnet_print(nn);
+    printf("\n");
+
+    // Read test dataset
+    printf("Loading testing dataset...");
+    Mnist *mnist_test = mnist_create(MNIST_NUM_TEST);
+    mnist_load_images(mnist_test, "./mnist-dataset/t10k-images.idx3-ubyte");
+    mnist_load_labels(mnist_test, "./mnist-dataset/t10k-labels.idx1-ubyte");
+    printf(" done!\n\n");
+
+    // Synthesize targets from the mnist structs
+    // mnist stores labels as uint8, but nn expects each target to be a vector with the samme size
+    // as its output layer
+    // ----------------------------------
+    Vector **targets_test = (Vector **)calloc(MNIST_NUM_TEST, sizeof(Vector *));
+    if (!targets_test)
+    {
+        perror("calloc test targets");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < MNIST_NUM_TEST; ++i)
+    {
+        // Create a one-hot vector for each target (element at index=label is set to 1)
+        targets_test[i] = linalg_vector_create(nn->layer_output_size);
+        linalg_vector_fill(targets_test[i], 0.0f);
+
+        int onehot_index = mnist_test->labels[i];
+        targets_test[i]->data[onehot_index] = 1.0f;
+    }
+    // ----------------------------------
+
+    // Test model
+    neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
+
+    // frees
+    for (int i = 0; i < MNIST_NUM_TEST; ++i)
+    {
+        linalg_vector_free(targets_test[i]);
+    }
+
+    free(targets_test);
+    mnist_free(mnist_test);
+    neuralnet_free(nn);
+}
+
+void cli_infer()
+{
+
+    // Read model file
+    // Convert image to 28x28
+    // Run inference
 }
 
 void random_experimentation();
 
 int main(int argc, char **argv)
 {
-    mnist_nn_training_driver();
+    // mnist_nn -train modeldefs
+    // mnist_nn -infer modelfile img
+
+    if (argc == 1)
+    {
+        mnist_nn_training_driver();
+        return 0;
+    }
+
+    const char *TRAIN = "--train";
+    const char *TEST = "--test";
+    const char *INFER = "--infer";
+    const char *LIST = "--list";
+
+    char *command = argv[1];
+
+    if (strcmp(command, TRAIN) == 0)
+    {
+        // Is supposed to train a model given the parameters listed in
+        // a modeldefs file
+    }
+    else if (strcmp(command, TEST) == 0)
+    {
+        // Is supposed to test a model given a modelfile
+
+        if (argc != 3)
+        {
+            printf("Usage: mnist_nn --test modelfile");
+            exit(EXIT_FAILURE);
+        }
+
+        char *modelfile_fp = argv[2];
+        cli_test(modelfile_fp);
+    }
+    else if (strcmp(command, INFER) == 0)
+    {
+        // Is supposed to infer a number based on the input modelfile and .bmp image
+        printf("-infer is not yet implemented.");
+    }
+    else if (strcmp(command, LIST) == 0)
+    {
+        // Is supposed to list the metadata inside of the modelfile
+        // Training parameters, layer sizes, etc
+    }
+    else
+    {
+        printf("Usage:\n");
+        printf("mnist_nn --train paramsfile.txt\n");
+        printf("mnist_nn --test modelfile\n");
+        printf("mnist_nn --infer modelfile img.bmp\n");
+        printf("mnist_nn --list modelfile");
+    }
 
     return 0;
 }

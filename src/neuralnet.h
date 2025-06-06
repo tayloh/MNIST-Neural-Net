@@ -58,7 +58,7 @@ typedef struct
 NeuralNet *neuralnet_create(int num_layers, int *layer_sizes);
 void neuralnet_free(NeuralNet *nn);
 
-void neuralnet_load_model(NeuralNet *nn, const char *model_fp); // todo
+NeuralNet *neuralnet_load_model(const char *model_fp);          // todo
 void neuralnet_save_model(NeuralNet *nn, const char *model_fp); // todo
 void neuralnet_set_activation(NeuralNet *nn, float (*activation)(float));
 void neuralnet_set_activation_derivative(NeuralNet *nn, float (*activation_derivative)(float));

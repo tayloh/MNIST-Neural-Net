@@ -114,10 +114,23 @@ NeuralNet *neuralnet_create(int num_layers, int *layer_sizes)
 
     nn->init_called = 0;
     nn->num_layers = num_layers;
+
     nn->layer_input_size = layer_sizes[0];
     nn->layer_output_size = layer_sizes[num_layers - 1];
 
-    nn->layer_sizes = layer_sizes;
+    // This is BAD: when using load_model(), I allocate layer_sizes on the stack
+    // and pass its pointer into create(). When load_model() returns, that stack mem is garbage
+    // it worked before that since everything was held in the same stack frame (in main.c main() driver func)
+    // nn->layer_sizes = layer_sizes;
+
+    // Solution: make a deep copy, and free it in free()
+    nn->layer_sizes = malloc(num_layers * sizeof(int));
+    if (!nn->layer_sizes)
+    {
+        perror("malloc layer_sizes");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(nn->layer_sizes, layer_sizes, num_layers * sizeof(int));
 
     // Set these after creating using separate function
     nn->activation = NULL;
@@ -205,6 +218,7 @@ void neuralnet_free(NeuralNet *nn)
         linalg_vector_free(nn->biases[i]);
     }
 
+    free(nn->layer_sizes);
     free(nn->weights);
     free(nn->biases);
 
@@ -251,17 +265,144 @@ float ReLU_derivative(float x)
     return x > 0.0f ? 1.0f : 0.0f;
 }
 
-void neuralnet_load_model(NeuralNet *nn, const char *model_fp)
+NeuralNet *neuralnet_load_model(const char *model_fp)
 {
+
+    FILE *f = fopen(model_fp, "rb");
+    if (!f)
+    {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+
+    // Read num_layers
+    int num_layers;
+
+    if (fread(&num_layers, sizeof(uint32_t), 1, f) != 1)
+    {
+        fprintf(stderr, "Error: neuralnet_load_model failed to read num_layers");
+        exit(EXIT_FAILURE);
+    }
+
+    // Read layer sizes
+    int layer_sizes[num_layers];
+    if (fread(layer_sizes, sizeof(uint32_t), num_layers, f) != num_layers)
+    {
+        fprintf(stderr, "Error: neuralnet_load_model failed to read layer_sizes");
+        exit(EXIT_FAILURE);
+    }
+
+    // Create the neuralnet (allocates weights and biases, etc)
+    NeuralNet *nn = neuralnet_create(num_layers, layer_sizes);
+
+    int L = nn->num_layers;
+
+    // Read biases
+    for (int l = 0; l < L - 1; ++l)
+    {
+        // l + 1 since first layer has no biases
+        if (fread(nn->biases[l]->data, sizeof(float), nn->layer_sizes[l + 1], f) != nn->layer_sizes[l + 1])
+        {
+            fprintf(stderr, "Error: neuralnet_load_model failed to read biases");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Read weights
+    for (int l = 0; l < L - 1; ++l)
+    {
+        // Number of neurons on the layer is nn->layer_sizes[l + 1]
+        // layer_sizes is offset by +1 since weights num weight matrices is one less than num layers
+        int num_curr_layer_neurons = nn->layer_sizes[l + 1];
+        int num_prev_layer_neurons = nn->layer_sizes[l];
+
+        for (int i = 0; i < num_curr_layer_neurons; ++i)
+        {
+            if (!nn->weights[l]->data[i])
+            {
+                fprintf(stderr, "weights[%d]->data[%d] is NULL\n", l, i);
+                exit(EXIT_FAILURE);
+            }
+            // Each neuron has nn->layer_sizes[l] weights (nr of neurons on prev layer)
+            if (fread(nn->weights[l]->data[i], sizeof(float), num_prev_layer_neurons, f) != num_prev_layer_neurons)
+            {
+                fprintf(stderr, "Error: neuralnet_load_model failed to load weights");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    fclose(f);
+
+    return nn;
 }
 
 void neuralnet_save_model(NeuralNet *nn, const char *model_fp)
 {
-    // File format something like
-    // First byte: number of layers L
-    // L next bytes: layer sizes
-    // float (4bytes) * layer sizes [0] ... float * layer sizes[L-2] next bytes: biases
-    // float * layer sizes [1] * layer sizes[0] next bytes: weights
+    // TODO: Maybe save metadata in the modelfile about how it was trained
+    // So that when it is loaded, that can be printed
+
+    if (!nn)
+    {
+        fprintf(stderr, "Error: neuralnet_save_model NULL nn");
+        exit(EXIT_FAILURE);
+    }
+
+    FILE *f = fopen(model_fp, "wb");
+    if (!f)
+    {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+
+    uint32_t L = nn->num_layers;
+    if (fwrite(&L, sizeof(uint32_t), 1, f) != 1)
+    {
+        fprintf(stderr, "Error: neuralnet_save_model failed to save num_layers");
+        exit(EXIT_FAILURE);
+    }
+
+    if (fwrite(nn->layer_sizes, sizeof(uint32_t), L, f) != L)
+    {
+        fprintf(stderr, "Error: neuralnet_save_model failed to save layer_sizes");
+        exit(EXIT_FAILURE);
+    }
+
+    // Save biases
+    for (int l = 0; l < L - 1; ++l)
+    {
+        if (fwrite(nn->biases[l]->data, sizeof(float), nn->biases[l]->size, f) != nn->biases[l]->size)
+        {
+            fprintf(stderr, "Error: neuralnet_save_model failed to save biases");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Save weights (num weight matrices = L - 1)
+    for (int l = 0; l < L - 1; ++l)
+    {
+        // Number of neurons on the layer is nn->layer_sizes[l + 1]
+        // layer_sizes is offset by +1 since weights num weight matrices is one less than num layers
+        int num_curr_layer_neurons = nn->layer_sizes[l + 1];
+        int num_prev_layer_neurons = nn->layer_sizes[l];
+
+        for (int i = 0; i < num_curr_layer_neurons; ++i)
+        {
+            if (!nn->weights[l]->data[i])
+            {
+                fprintf(stderr, "write weights[%d]->data[%d] is NULL\n", l, i);
+                exit(EXIT_FAILURE);
+            }
+            // Each neuron has nn->layer_sizes[l] weights (nr of neurons on prev layer)
+            if (fwrite(nn->weights[l]->data[i], sizeof(float), num_prev_layer_neurons, f) != num_prev_layer_neurons)
+            {
+                fprintf(stderr, "Error: neuralnet_save_model failed to save weights");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    fclose(f);
 }
 
 // Initialize weights and biases using He initialization
@@ -631,6 +772,12 @@ void neuralnet_test(NeuralNet *nn, Vector **inputs, Vector **targets, int num_sa
     if (!nn)
     {
         fprintf(stderr, "Error: neuralnet_test NULL nn");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!nn->activation)
+    {
+        fprintf(stderr, "Error: neuralnet_test NULL activation function");
         exit(EXIT_FAILURE);
     }
 
