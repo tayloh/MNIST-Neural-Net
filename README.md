@@ -10,8 +10,15 @@ MNIST is a database of handwritten digits that are used to train and test image 
 
 Speeds per training sample up by one order of magnitude:  
 `gcc -O3 -march=native -ffast-math -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c linalg/src/vector.c linalg/src/matrix.c`
+ 
+To train a model:  
+`bin/mnist_nn.exe --train params.txt modelfile`  
+* Training parameters set in params.txt
+* modelfile is the output model (binary)
 
-`bin/mnist_nn.exe`
+To test a model:  
+`bin/mnist_nn.exe --test modelfile`  
+* modelfile is the model created by --train to be tested
 
 ## Spec
 ~ 70 15 15 train validate test split with 98.4 % accuracy on test (highest measured)  
