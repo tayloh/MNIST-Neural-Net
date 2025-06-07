@@ -26,7 +26,7 @@ To test a model:
 
 Testing output should look something like this:  
 
-![test_img](./img/train.png)
+![test_img](./img/test.png)
 
 ## Spec
 ~ 70 15 15 train validate test split with 98.4 % accuracy on test (highest measured)  
