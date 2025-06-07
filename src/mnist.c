@@ -72,7 +72,7 @@ void mnist_free(Mnist *mnist)
     free(mnist);
 }
 
-void mnist_load_images(Mnist *mnist, const char *mnist_images_fp)
+void mnist_load_images(Mnist *mnist, const char *mnist_images_fp, int use_binary_color)
 {
     FILE *f = fopen(mnist_images_fp, "rb");
     if (!f)
@@ -115,6 +115,14 @@ void mnist_load_images(Mnist *mnist, const char *mnist_images_fp)
         for (int j = 0; j < MNIST_IMAGE_SIZE; ++j)
         {
             mnist->images[i]->data[j] = buffer[j] / 255.0f; // normalize
+
+            // Easier to train the network for binary colors, than trying
+            // to transform actual input digits to "look like" mnist training data
+            // since there is peculiar anti-aliasing and such
+            if (use_binary_color)
+            {
+                mnist->images[i]->data[j] <= 0.5f ? 0.0f : 1.0f;
+            }
         }
     }
 
@@ -169,7 +177,7 @@ void mnist_print_image(const Mnist *mnist, int index)
 
     for (int i = 0; i < MNIST_IMAGE_SIZE; ++i)
     {
-        if (i % 28 == 0)
+        if (i % MNIST_IMAGE_COLS == 0)
         {
             printf("\n");
         }
@@ -192,7 +200,7 @@ void mnist_print_image_x(const Mnist *mnist, int index)
 
     for (int i = 0; i < MNIST_IMAGE_SIZE; ++i)
     {
-        if (i % 28 == 0)
+        if (i % MNIST_IMAGE_COLS == 0)
         {
             printf("\n");
         }

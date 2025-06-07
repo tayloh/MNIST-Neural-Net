@@ -30,7 +30,7 @@ typedef struct
 } Mnist;
 
 Mnist *mnist_create(int size);
-void mnist_load_images(Mnist *mnist, const char *mnist_images_fp);
+void mnist_load_images(Mnist *mnist, const char *mnist_images_fp, int use_binary_color);
 void mnist_load_labels(Mnist *mnist, const char *mnist_labels_fp);
 void mnist_free(Mnist *mnist);
 
