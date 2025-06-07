@@ -7,6 +7,9 @@
 #include "../linalg/include/linalg.h"
 #include "mnist.h"
 #include "neuralnet.h"
+#include "bmp.h"
+
+#define USE_BINARY_COLORS 1
 
 void cli_train(const char *params_fp, const char *model_fp)
 {
@@ -120,7 +123,7 @@ void cli_train(const char *params_fp, const char *model_fp)
     // ---- Load Mnist datasets ----
     printf("\nLoading training dataset...");
     Mnist *mnist_train = mnist_create(MNIST_NUM_TRAIN);
-    mnist_load_images(mnist_train, "./mnist-dataset/train-images.idx3-ubyte");
+    mnist_load_images(mnist_train, "./mnist-dataset/train-images.idx3-ubyte", USE_BINARY_COLORS);
     mnist_load_labels(mnist_train, "./mnist-dataset/train-labels.idx1-ubyte");
     printf(" done!\n\n");
 
@@ -183,7 +186,7 @@ void cli_test(const char *model_fp)
     // Read test dataset
     printf("Loading testing dataset...");
     Mnist *mnist_test = mnist_create(MNIST_NUM_TEST);
-    mnist_load_images(mnist_test, "./mnist-dataset/t10k-images.idx3-ubyte");
+    mnist_load_images(mnist_test, "./mnist-dataset/t10k-images.idx3-ubyte", USE_BINARY_COLORS);
     mnist_load_labels(mnist_test, "./mnist-dataset/t10k-labels.idx1-ubyte");
     printf(" done!\n\n");
 
@@ -222,12 +225,69 @@ void cli_test(const char *model_fp)
     neuralnet_free(nn);
 }
 
-void cli_infer()
+void prettyprint_scaled_bmp_vector(const Vector *bmp_vector)
 {
+    for (int i = 0; i < bmp_vector->size; ++i)
+    {
+        if (i % MNIST_IMAGE_COLS == 0)
+        {
+            printf("\n");
+        }
 
-    // Read modelfile
-    // Convert bmp image to 28x28
+        if (bmp_vector->data[i] == 0)
+        {
+            printf("=");
+        }
+        else
+        {
+            // printf("%f ", bmp_vector->data[i]);
+            printf(" ");
+        }
+    }
+}
+
+float invert_bmp_color(float grayscale_color)
+{
+    return 1.0f - grayscale_color;
+}
+
+void cli_infer(const char *model_fp, const char *bmp_fp)
+{
+    // Read bmp into a matrix
+    Matrix *bmp_matrix = bmp_create_matrix(bmp_fp);
+
+    // Normalize values
+    linalg_matrix_scale(bmp_matrix, 1.0f / 255.0f);
+
+    // Invert grayscale theme so that 0 -> white, 1 -> black (as in training data)
+    linalg_matrix_apply(bmp_matrix, invert_bmp_color);
+
+    // Downsample to 28x28
+    Matrix *bmp_matrix_downsampled = bmp_downsample_maxpooling(bmp_matrix, MNIST_IMAGE_ROWS, MNIST_IMAGE_COLS);
+
+    // Flatten to array for input to nn
+    Vector *nn_input = linalg_matrix_flatten(bmp_matrix_downsampled);
+    // linalg_vector_scale(nn_input, 1.0f / 255.0f);
+
+    // Read modelfile and allocate nn
+    NeuralNet *nn = neuralnet_load_model(model_fp);
+    neuralnet_set_activation(nn, ReLU);
+
     // Run inference
+    int prediction = neuralnet_infer(nn, nn_input);
+
+    printf("Input bmp (%s) as ASCII:", bmp_fp);
+    prettyprint_scaled_bmp_vector(nn_input);
+
+    printf("\n\nNeuralNet prediction: %d", prediction);
+
+    linalg_matrix_free(bmp_matrix);
+    linalg_matrix_free(bmp_matrix_downsampled);
+    linalg_vector_free(nn_input);
+    neuralnet_free(nn);
+
+    // In MNIST, > 0 means "color", so we do maxpooling
+    // In input, 0 is black
 }
 
 int main(int argc, char **argv)
@@ -261,7 +321,7 @@ int main(int argc, char **argv)
         if (argc != 4)
         {
             printf("Usage: mnist_nn --train params.txt modelfile");
-            return -1;
+            return 1;
         }
 
         char *params_fp = argv[2];
@@ -275,7 +335,7 @@ int main(int argc, char **argv)
         if (argc != 3)
         {
             printf("Usage: mnist_nn --test modelfile");
-            return -1;
+            return 2;
         }
 
         char *modelfile_fp = argv[2];
@@ -284,14 +344,23 @@ int main(int argc, char **argv)
     else if (strcmp(command, INFER) == 0)
     {
         // Is supposed to infer a number based on the input modelfile and .bmp image
-        printf("-infer is not yet implemented.");
+
+        if (argc != 4)
+        {
+            printf("Usage: mnist_nn --infer img.bmp modelfile");
+            return 3;
+        }
+
+        char *bmp_fp = argv[2];
+        char *model_fp = argv[3];
+        cli_infer(model_fp, bmp_fp);
     }
     else
     {
         printf("Usage:\n");
-        printf("mnist_nn --train paramsfile.txt\n");
+        printf("mnist_nn --train params.txt modelfile\n");
         printf("mnist_nn --test modelfile\n");
-        printf("mnist_nn --infer modelfile img.bmp\n");
+        printf("mnist_nn --infer img.bmp modelfile\n");
     }
 
     return 0;
