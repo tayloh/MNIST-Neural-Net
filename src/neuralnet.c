@@ -318,11 +318,6 @@ NeuralNet *neuralnet_load_model(const char *model_fp)
 
         for (int i = 0; i < num_curr_layer_neurons; ++i)
         {
-            if (!nn->weights[l]->data[i])
-            {
-                fprintf(stderr, "weights[%d]->data[%d] is NULL\n", l, i);
-                exit(EXIT_FAILURE);
-            }
             // Each neuron has nn->layer_sizes[l] weights (nr of neurons on prev layer)
             if (fread(nn->weights[l]->data[i], sizeof(float), num_prev_layer_neurons, f) != num_prev_layer_neurons)
             {
