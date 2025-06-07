@@ -7,7 +7,7 @@ MNIST is a database of handwritten digits that are used to train and test image 
 
 ## Compile and run
 Flags in main.c:  
-`USE_BINARY_COLORS` - Setting this to 1 will load the MNIST images as binary colored images. The resulting network should be better at predicting e.g. mspaint drawn digits.
+`USE_BINARY_COLORS` - Setting this to 1 will load the MNIST images as binary colored images (only black and white, no grayscale). The resulting network should be better at predicting e.g. mspaint drawn digits where the background is white and the digit is black.
 
 Recommended compilation (no optimization flags => 10x slower training)   
 `gcc -O3 -march=native -ffast-math -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c src/bmp.c linalg/src/vector.c linalg/src/matrix.c`
