@@ -5,12 +5,14 @@ Runs on CPU (single-thread), with stochastic gradient descent. Matrix/vector ope
 
 MNIST is a database of handwritten digits that are used to train and test image classification software.
 
-## Run
-`gcc -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c linalg/src/vector.c linalg/src/matrix.c`
+## Compile and run
+Flags in main.c:  
+`USE_BINARY_COLORS` - Setting this to 1 will load the MNIST images as binary colored images. The resulting network should be better at predicting e.g. mspaint drawn digits.
 
-Speeds per training sample up by one order of magnitude:  
-`gcc -O3 -march=native -ffast-math -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c linalg/src/vector.c linalg/src/matrix.c`
+Recommended compilation (no optimization flags => 10x slower training)   
+`gcc -O3 -march=native -ffast-math -o bin/mnist_nn.exe src/main.c src/mnist.c src/neuralnet.c src/bmp.c linalg/src/vector.c linalg/src/matrix.c`
  
+### Train
 To train a model:  
 `bin/mnist_nn.exe --train params.txt modelfile`  
 * Training parameters set in params.txt
@@ -20,6 +22,7 @@ Training output should look something like this (progress bar will only work on 
 
 ![train_img](./img/train.png)
 
+### Test
 To test a model:  
 `bin/mnist_nn.exe --test modelfile`  
 * modelfile is the model created by --train to be tested
@@ -28,7 +31,15 @@ Testing output should look something like this:
 
 ![test_img](./img/test.png)
 
-## Spec
+### Inference on custom bmp
+To run inference on a bmp (bmp must use 256-bit colors):  
+`bin/mnist_nn.exe --infer image.bmp modelfile`
+
+![infer_img](./img/infer.png)
+
+Unfortunately, predictions are not at all as good as the testing results on the MNIST test data. This is a domain adaptation problem, and I probably wont spend much time trying to transform or filter the input bmps in such a way that it resembles the MNIST training data as much as possible.
+
+## Specification
 ~ 70 15 15 train validate test split with 98.4 % accuracy on test (highest measured)  
 
 Architecture: 784, 256, 10  
