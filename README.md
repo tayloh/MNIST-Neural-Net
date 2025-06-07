@@ -32,8 +32,11 @@ Testing output should look something like this:
 ![test_img](./img/test.png)
 
 ### Inference on custom bmp
-To run inference on a bmp (bmp must use 256-bit colors):  
+To run inference on a bmp:  
 `bin/mnist_nn.exe --infer image.bmp modelfile`
+
+* The bmp must use 256-bit colors
+* And, the digit must be black on a white background
 
 ![infer_img](./img/infer.png)
 

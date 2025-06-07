@@ -214,7 +214,7 @@ void cli_test(const char *model_fp)
     // Test model
     neuralnet_test(nn, mnist_test->images, targets_test, MNIST_NUM_TEST);
 
-    // frees
+    // Frees
     for (int i = 0; i < MNIST_NUM_TEST; ++i)
     {
         linalg_vector_free(targets_test[i]);
@@ -240,7 +240,6 @@ void prettyprint_scaled_bmp_vector(const Vector *bmp_vector)
         }
         else
         {
-            // printf("%f ", bmp_vector->data[i]);
             printf(" ");
         }
     }
@@ -259,7 +258,8 @@ void cli_infer(const char *model_fp, const char *bmp_fp)
     // Normalize values
     linalg_matrix_scale(bmp_matrix, 1.0f / 255.0f);
 
-    // Invert grayscale theme so that 0 -> white, 1 -> black (as in training data)
+    // MNIST images have black background and white digits
+    // So we need to invert the input (assume digits are black and background is white)
     linalg_matrix_apply(bmp_matrix, invert_bmp_color);
 
     // Downsample to 28x28
@@ -285,9 +285,6 @@ void cli_infer(const char *model_fp, const char *bmp_fp)
     linalg_matrix_free(bmp_matrix_downsampled);
     linalg_vector_free(nn_input);
     neuralnet_free(nn);
-
-    // In MNIST, > 0 means "color", so we do maxpooling
-    // In input, 0 is black
 }
 
 int main(int argc, char **argv)
@@ -296,7 +293,7 @@ int main(int argc, char **argv)
 
     // mnist_nn --train params.txt modelfile
     // mnist_nn --test modelfile
-    // mnist_nn --infer modelfile img.bmp
+    // mnist_nn --infer img.bmp modelfile
 
     if (argc == 1)
     {
