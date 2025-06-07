@@ -2,4 +2,8 @@ todo
 .vscode/
 notes/
 
+models/
+
+test.bmp
+
 src/experimentation.c
