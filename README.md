@@ -16,9 +16,17 @@ To train a model:
 * Training parameters set in params.txt
 * modelfile is the output model (binary)
 
+Training output should look something like this (progress bar will only work on Windows):  
+
+![train_img](./img/train.png)
+
 To test a model:  
 `bin/mnist_nn.exe --test modelfile`  
 * modelfile is the model created by --train to be tested
+
+Testing output should look something like this:  
+
+![test_img](./img/train.png)
 
 ## Spec
 ~ 70 15 15 train validate test split with 98.4 % accuracy on test (highest measured)  
