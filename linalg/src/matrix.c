@@ -432,3 +432,24 @@ void linalg_matrix_copy_into(Matrix *a, const Matrix *b)
         memcpy(a->data[i], b->data[i], b->columns * sizeof(float));
     }
 }
+
+Vector *linalg_matrix_flatten(const Matrix *m)
+{
+    if (!m || !m->data)
+    {
+        fprintf(stderr, "Error: matrix_apply NULL matrix");
+        exit(EXIT_FAILURE);
+    }
+
+    Vector *result = linalg_vector_create(m->rows * m->columns);
+
+    for (int i = 0; i < m->rows; ++i)
+    {
+        for (int j = 0; j < m->columns; ++j)
+        {
+            result->data[i * m->columns + j] = m->data[i][j];
+        }
+    }
+
+    return result;
+}

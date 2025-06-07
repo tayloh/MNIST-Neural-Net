@@ -75,4 +75,6 @@ void linalg_matrix_apply(Matrix *m, float (*func)(float));
 Vector *linalg_matrix_get_column(const Matrix *m, int column);
 Vector *linalg_matrix_get_row(const Matrix *m, int row);
 
+Vector *linalg_matrix_flatten(const Matrix *m);
+
 #endif
