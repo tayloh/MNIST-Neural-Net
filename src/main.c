@@ -129,12 +129,163 @@ void mnist_nn_training_driver()
     // return nn;
 }
 
-void cli_train()
+void cli_train(const char *params_fp, const char *model_fp)
 {
 
-    // Read parameters file
-    // Train model
-    // Save model
+    // Should break this into its own function (the param file read)... but I cba
+    // to make a struct for training parameters to pass around...
+
+    // int layer_sizes[MAX_LAYERS];
+    int nlayers = 0;
+    float learning_rate = 0.0f;
+    float lambda = 0.0f;
+    int patience = 0;
+    int max_epochs = 0;
+    int num_validation_samples = 0;
+
+    // ---------------------------------------
+    // --- Read parameters file --------------
+    // ---------------------------------------
+    FILE *f = fopen(params_fp, "r");
+    if (!f)
+    {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+
+    const int MAX_LENGTH = 256;
+    const int MAX_LAYERS = 100;
+
+    char line[MAX_LENGTH];
+
+    // Collect layer_sizes in the while loop and then copy over to smaller array
+    int layer_sizes_collect[MAX_LAYERS];
+
+    while (fgets(line, sizeof(line), f))
+    {
+
+        // Strip newline
+        // 0 sets '\0' which terminates the string
+        line[strcspn(line, "\n")] = 0;
+
+        // Split line on first space
+        char *key = strtok(line, " ");
+        char *value = strtok(NULL, "");
+
+        if (!key || !value)
+        {
+            continue;
+        }
+
+        // Read params
+        if (strcmp(key, "nlayers") == 0)
+        {
+            nlayers = atoi(value);
+        }
+        else if (strcmp(key, "learning_rate") == 0)
+        {
+            learning_rate = strtof(value, NULL);
+        }
+        else if (strcmp(key, "lambda") == 0)
+        {
+            lambda = strtof(value, NULL);
+        }
+        else if (strcmp(key, "patience") == 0)
+        {
+            patience = atoi(value);
+        }
+        else if (strcmp(key, "max_epochs") == 0)
+        {
+            max_epochs = atoi(value);
+        }
+        else if (strcmp(key, "num_validation_samples") == 0)
+        {
+            num_validation_samples = atoi(value);
+        }
+
+        if (strcmp(key, "layers") == 0)
+        {
+            char *token = strtok(value, ",");
+            for (int i = 0; token && i < nlayers; ++i)
+            {
+                layer_sizes_collect[i] = atoi(token);
+                token = strtok(NULL, ",");
+            }
+        }
+    }
+
+    fclose(f);
+
+    // Set layer_sizes here
+    int layer_sizes[nlayers];
+    memcpy(layer_sizes, layer_sizes_collect, nlayers * sizeof(int));
+
+    printf("Read parameters file...\n");
+    printf("nlayers                %d\n", nlayers);
+    printf("layers                 ");
+    for (int i = 0; i < nlayers; ++i)
+    {
+        printf("%d ", layer_sizes[i]);
+    }
+    printf("\n");
+    printf("learning_rate          %f\n", learning_rate);
+    printf("lambda                 %f\n", lambda);
+    printf("patience               %d\n", patience);
+    printf("max_epochs             %d\n", max_epochs);
+    printf("num_validation_samples %d\n", num_validation_samples);
+
+    // ---------------------------------------
+    // --- Train modell ----------------------
+    // ---------------------------------------
+
+    // ---- Load Mnist datasets ----
+    printf("\nLoading training dataset...");
+    Mnist *mnist_train = mnist_create(MNIST_NUM_TRAIN);
+    mnist_load_images(mnist_train, "./mnist-dataset/train-images.idx3-ubyte");
+    mnist_load_labels(mnist_train, "./mnist-dataset/train-labels.idx1-ubyte");
+    printf(" done!\n\n");
+
+    // ---- Allocate neuralnet ----
+    NeuralNet *nn = neuralnet_create(nlayers, layer_sizes);
+    neuralnet_set_activation(nn, ReLU);
+    neuralnet_set_activation_derivative(nn, ReLU_derivative);
+    neuralnet_init_w_b_he(nn);
+
+    // ---- Synthesize one-hot vectors from mnist ----
+    Vector **targets_train = (Vector **)calloc(MNIST_NUM_TRAIN, sizeof(Vector *));
+    if (!targets_train)
+    {
+        perror("calloc train targets");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < MNIST_NUM_TRAIN; ++i)
+    {
+        // Create a one-hot vector for each target (element at index=label is set to 1)
+        targets_train[i] = linalg_vector_create(nn->layer_output_size);
+        linalg_vector_fill(targets_train[i], 0.0f);
+
+        int onehot_index = mnist_train->labels[i];
+        targets_train[i]->data[onehot_index] = 1.0f;
+    }
+
+    neuralnet_train(nn, mnist_train->images, targets_train, MNIST_NUM_TRAIN, num_validation_samples, learning_rate, max_epochs, lambda, patience);
+
+    // ---------------------------------------
+    // --- Save model ------------------------
+    // ---------------------------------------
+    neuralnet_save_model(nn, model_fp);
+
+    // ---------------------------------------
+    // --- Frees -----------------------------
+    // ---------------------------------------
+    for (int i = 0; i < MNIST_NUM_TRAIN; ++i)
+    {
+        linalg_vector_free(targets_train[i]);
+    }
+
+    free(targets_train);
+    mnist_free(mnist_train);
+    neuralnet_free(nn);
 }
 
 void cli_test(const char *model_fp)
@@ -224,6 +375,16 @@ int main(int argc, char **argv)
     {
         // Is supposed to train a model given the parameters listed in
         // a modeldefs file
+
+        if (argc != 4)
+        {
+            printf("Usage: mnist_nn --train params.txt modelfile");
+            exit(EXIT_FAILURE);
+        }
+
+        char *params_fp = argv[2];
+        char *model_fp = argv[3];
+        cli_train(params_fp, model_fp);
     }
     else if (strcmp(command, TEST) == 0)
     {
